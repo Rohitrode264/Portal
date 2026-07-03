@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+@theme {
+  --font-gilroy: "Gilroy", system-ui, -apple-system, sans-serif;
+}
+
+* {
+  font-family: "Gilroy", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: #f8f8f8;
+  color: #111;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
