@@ -16,6 +16,8 @@ type DetailedQuestion = {
   marksAwarded: number;
   maxMarks: number;
   difficulty: string;
+  diagramUrl?: string;
+  diagramUrls?: string[];
 };
 
 type ResultData = {
@@ -330,6 +332,19 @@ export function StudentResultView() {
                   <p className="text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-wrap mb-4">
                     {q.text}
                   </p>
+
+                  {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
+                    <div className="mb-4 flex justify-center">
+                      <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white" />
+                    </div>
+                  )}
+                  {q.diagramUrls && q.diagramUrls.length > 0 && (
+                    <div className="mb-4 flex flex-wrap gap-4 justify-center">
+                      {q.diagramUrls.map(url => (
+                        <img key={url} src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white" />
+                      ))}
+                    </div>
+                  )}
 
                   {/* Options Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">

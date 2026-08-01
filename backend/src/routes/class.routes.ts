@@ -11,6 +11,6 @@ router.get('/', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => cl
 router.get('/:classId/students', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => classController.getClassStudents(req, res));
 
 // Admin only
-router.patch('/:classId/coordinator', requireRole(['ADMIN']), (req, res) => classController.assignCoordinator(req, res));
+router.patch('/:classId/config', requireRole(['ADMIN']), (req, res) => classController.updateClassConfig(req, res));
 
 export default router;

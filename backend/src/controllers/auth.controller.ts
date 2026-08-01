@@ -28,7 +28,7 @@ export class AuthController {
                 const student = await Student.findOne({ admissionNumber: cleanId });
                 if (!student) {
                     res.status(404).json({ error: 'Student not found. Please check your CP ID.' });
-                    return;
+                    return; 
                 }
                 if (student.status !== 'ACTIVE') {
                     res.status(403).json({ error: 'Your account is not active. Contact the institute.' });
@@ -74,7 +74,7 @@ export class AuthController {
                     });
                     return;
                 }
-
+                    
                 const otpCode = authService.generateOtp();
                 const expiresAt = new Date(Date.now() + 5 * 60_000); // 5 minutes
                 const newResendCount = existingOtp ? existingOtp.resendCount + 1 : 0;
@@ -88,8 +88,14 @@ export class AuthController {
                     lastSentAt: new Date(),
                     resendCount: newResendCount,
                 });
-
-                await whatsAppService.sendOtp(whatsappNumber, otpCode);
+                
+                const sent = await whatsAppService.sendOtp(whatsappNumber, otpCode);
+                
+                if (!sent) {
+                    await Otp.deleteMany({ identifier: cleanId });
+                    res.status(500).json({ error: 'Failed to send WhatsApp OTP. Please check the WhatsApp API configuration or try again later.' });
+                    return;
+                }
 
                 const maskedNumber = whatsappNumber.slice(0, 4) + 'XXXXXX';
                 res.json({

@@ -2,8 +2,12 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Clock, CheckCircle2, ChevronRight, Radio, Award, AlertCircle, Calendar } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Icon } from '../../components/ui/Icon';
+import { EmptyExamsIllustration, TrophyIllustration } from '../../components/ui/Illustrations';
 
 type Exam = {
   _id: string;
@@ -18,37 +22,50 @@ type Exam = {
   sessionStatus: 'ABSENT' | 'PRESENT' | 'IN_PROGRESS' | 'SUBMITTED' | 'AUTO_SUBMITTED' | null;
 };
 
+/* ── Countdown ────────────────────────────────────────────────────────────── */
 function Countdown({ targetDate }: { targetDate: string }) {
   const [timeLeft, setTimeLeft] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
-
   useEffect(() => {
     const timer = setInterval(() => {
-      const diff = new Date(targetDate).getTime() - new Date().getTime();
+      const diff = new Date(targetDate).getTime() - Date.now();
       if (diff <= 0) { setTimeLeft(null); clearInterval(timer); return; }
       setTimeLeft({
-        d: Math.floor(diff / (1000 * 60 * 60 * 24)),
-        h: Math.floor((diff / (1000 * 60 * 60)) % 24),
-        m: Math.floor((diff / 1000 / 60) % 60),
-        s: Math.floor((diff / 1000) % 60)
+        d: Math.floor(diff / 86400000),
+        h: Math.floor((diff / 3600000) % 24),
+        m: Math.floor((diff / 60000) % 60),
+        s: Math.floor((diff / 1000) % 60),
       });
     }, 1000);
     return () => clearInterval(timer);
   }, [targetDate]);
-
-  if (!timeLeft) return <span className="text-xs text-green-600 font-medium">Starting soon</span>;
-
+  if (!timeLeft) return <span style={{ color: 'var(--success)' }} className="text-[12px] font-semibold">Starting soon</span>;
   return (
-    <span className="text-xs text-gray-500 font-mono tabular-nums">
-      {timeLeft.d > 0 && `${timeLeft.d}d `}{String(timeLeft.h).padStart(2,'0')}:{String(timeLeft.m).padStart(2,'0')}:{String(timeLeft.s).padStart(2,'0')}
+    <span style={{ color: 'var(--text-muted)' }} className="text-[12px] font-mono tabular-nums">
+      {timeLeft.d > 0 && `${timeLeft.d}d `}{String(timeLeft.h).padStart(2, '0')}:{String(timeLeft.m).padStart(2, '0')}:{String(timeLeft.s).padStart(2, '0')}
     </span>
   );
 }
 
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+/* ── Helpers ──────────────────────────────────────────────────────────────── */
+const formatDate = (d: string) => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+const formatTime = (d: string) => new Date(d).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const getGreeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+
+/* ── Section label ────────────────────────────────────────────────────────── */
+function SectionLabel({ label, icon }: { label: string; icon?: string }) {
+  return (
+    <div className="flex items-center gap-2 mb-3">
+      {icon && <Icon name={icon} size={14} style={{ color: 'var(--text-muted)' }} />}
+      <p style={{ color: 'var(--text-muted)' }} className="text-[11px] font-semibold uppercase tracking-widest">{label}</p>
+    </div>
+  );
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   MAIN COMPONENT
+   ═══════════════════════════════════════════════════════════════════════════ */
 export function StudentDashboard() {
+  const { user } = useAuth();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'past'>('active');
@@ -60,172 +77,168 @@ export function StudentDashboard() {
     try {
       const res = await api.get('/student/exams');
       setExams(res.data.exams);
-    } catch {
-      toast.error('Failed to load dashboard');
-    } finally {
-      setLoading(false);
-    }
+    } catch { toast.error('Failed to load dashboard'); }
+    finally { setLoading(false); }
   };
+
+  const upcoming  = exams.filter(e => e.status === 'PUBLISHED');
+  const live      = exams.filter(e => e.status === 'LIVE');
+  const completed = exams.filter(e => e.status === 'COMPLETED');
+  const firstName = user?.name?.split(' ')[0] || 'Student';
+  const todayStr  = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
 
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-gray-300" size={24} />
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <img src="/images/studying.webp" alt="Studying" className="w-48 opacity-40 object-contain" />
+          <p style={{ color: 'var(--text-muted)' }} className="text-[14px]">Loading your dashboard…</p>
         </div>
       </DashboardLayout>
     );
   }
 
-  const upcoming = exams.filter(e => e.status === 'PUBLISHED');
-  const live = exams.filter(e => e.status === 'LIVE');
-  const completed = exams.filter(e => e.status === 'COMPLETED');
-
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-5xl mx-auto">
+      <div className="space-y-6 animate-fade-in">
 
-        {/* Page header & tabs */}
-        <div className="flex items-center justify-between flex-wrap gap-4 border-b border-gray-100 pb-4">
-          <div>
-            <h1 className="text-lg font-bold text-gray-900">My Exams</h1>
-            <p className="text-xs text-gray-400 mt-0.5">Your test sessions, schedules, and past performance reports.</p>
-          </div>
-
-          {/* Navigation Tabs */}
-          <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-xl border border-gray-100">
-            <button
-              onClick={() => setActiveTab('active')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                activeTab === 'active'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>Active & Scheduled</span>
-              {(live.length + upcoming.length) > 0 && (
-                <span className="bg-red-500 text-white px-1.5 py-0.2 rounded-full text-[10px]">
-                  {live.length + upcoming.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => setActiveTab('past')}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all flex items-center gap-2 ${
-                activeTab === 'past'
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
-              }`}
-            >
-              <span>Past Exams</span>
-              <span className="bg-gray-200 text-gray-700 px-1.5 py-0.2 rounded-full text-[10px]">
-                {completed.length}
-              </span>
-            </button>
+        {/* ── Hero Card ───────────────────────────────────────────────── */}
+        <div
+          className="card overflow-hidden relative"
+          style={{ background: 'var(--surface)' }}
+        >
+          {/* subtle grid pattern */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: 'radial-gradient(circle, var(--border) 1px, transparent 1px)',
+              backgroundSize: '24px 24px',
+              opacity: 0.4,
+            }}
+          />
+          <div className="relative flex flex-col sm:flex-row items-center gap-0">
+            {/* Text */}
+            <div className="flex-1 px-6 py-7">
+              <p style={{ color: 'var(--accent)' }} className="text-[12px] font-semibold mb-1 uppercase tracking-wider">{todayStr}</p>
+              <h1 style={{ color: 'var(--text)' }} className="text-[24px] font-bold leading-snug">
+                {getGreeting()}, {firstName}! 👋
+              </h1>
+              <p style={{ color: 'var(--text-muted)' }} className="text-[14px] mt-1.5">
+                {live.length > 0
+                  ? `🔴 You have ${live.length} live exam${live.length > 1 ? 's' : ''} right now!`
+                  : upcoming.length > 0
+                    ? `📅 ${upcoming.length} exam${upcoming.length > 1 ? 's' : ''} scheduled ahead.`
+                    : `✅ No upcoming exams. Great time to review your past results!`}
+              </p>
+              {/* Stats row */}
+              <div className="flex flex-wrap gap-2 mt-5">
+                <StatChip icon="task_alt" label={`${completed.length} Completed`} color="var(--success)" bgColor="var(--success-light)" />
+                <StatChip icon="schedule" label={`${upcoming.length} Upcoming`} color="var(--accent)" bgColor="var(--accent-light)" />
+                {live.length > 0 && <LiveChip count={live.length} />}
+              </div>
+            </div>
+            {/* Illustration */}
+            <div className="shrink-0 w-72 h-56 p-3 hidden sm:block" style={{ color: 'var(--text)' }}>
+              <img src="/images/studying.jpg" alt="Studying" className="w-full h-full object-contain" />
+            </div>
           </div>
         </div>
 
-        {/* TAB 1: ACTIVE & SCHEDULED */}
+        {/* ── Tab Bar ─────────────────────────────────────────────────── */}
+        <div
+          style={{ background: 'var(--surface-sub)' }}
+          className="flex items-center gap-0.5 p-0.5 rounded-xl w-fit"
+        >
+          {(['active', 'past'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={activeTab === tab
+                ? { background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 1px 3px rgb(0 0 0/.08)' }
+                : { color: 'var(--text-muted)' }
+              }
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold transition-all"
+            >
+              {tab === 'active' ? 'Active' : 'Past'}
+              {tab === 'active' && (live.length + upcoming.length) > 0 && (
+                <span style={{ background: 'var(--accent)', color: 'white' }}
+                  className="w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center leading-none">
+                  {live.length + upcoming.length}
+                </span>
+              )}
+              {tab === 'past' && completed.length > 0 && (
+                <span style={{ color: 'var(--text-muted)' }} className="text-[11px]">({completed.length})</span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* ── ACTIVE TAB ────────────────────────────────────────────── */}
         {activeTab === 'active' && (
-          <div className="space-y-8">
-            {/* ── LIVE EXAMS ── */}
+          <div className="space-y-5 stagger">
+
+            {/* Live exams */}
             {live.length > 0 && (
               <section>
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-                  </span>
-                  <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Live now</h2>
-                </div>
-                <div className="space-y-2.5">
-                  {live.map(exam => (
-                    <div
-                      key={exam._id}
-                      onClick={() => exam.sessionStatus !== 'SUBMITTED' && exam.sessionStatus !== 'AUTO_SUBMITTED' && navigate(`/live-exam/${exam._id}`)}
-                      className={`bg-white border rounded-2xl p-4 flex items-center justify-between gap-4 transition-all group ${
-                        exam.sessionStatus === 'SUBMITTED' || exam.sessionStatus === 'AUTO_SUBMITTED'
-                          ? 'border-gray-100 cursor-default opacity-75'
-                          : 'border-red-200 cursor-pointer hover:border-red-300 hover:shadow-md'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          exam.sessionStatus === 'SUBMITTED' || exam.sessionStatus === 'AUTO_SUBMITTED' ? 'bg-gray-50' : 'bg-red-50'
-                        }`}>
-                          {exam.sessionStatus === 'SUBMITTED' ? (
-                            <CheckCircle2 size={18} className="text-green-500" />
-                          ) : exam.sessionStatus === 'AUTO_SUBMITTED' ? (
-                            <CheckCircle2 size={18} className="text-gray-400" />
-                          ) : (
-                            <Radio size={18} className="text-red-500" />
-                          )}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-gray-900 truncate">{exam.title}</p>
-                          <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                            {exam.group} · {exam.duration} min
-                            {exam.scheduledAt && ` · Ends ${formatTime(new Date(new Date(exam.scheduledAt).getTime() + exam.duration * 60000).toISOString())}`}
-                          </p>
-                        </div>
-                      </div>
-                      {exam.sessionStatus === 'SUBMITTED' ? (
-                        <span className="shrink-0 text-xs font-semibold text-green-700 bg-green-50 px-3 py-1.5 rounded-xl border border-green-200">Submitted ✓</span>
-                      ) : exam.sessionStatus === 'AUTO_SUBMITTED' ? (
-                        <span className="shrink-0 text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">Auto-submitted</span>
-                      ) : (
-                        <button
-                          onClick={e => { e.stopPropagation(); navigate(`/live-exam/${exam._id}`); }}
-                          className="shrink-0 bg-red-600 text-white text-xs font-bold px-5 py-2.5 rounded-xl hover:bg-red-700 transition-colors shadow-sm"
-                        >
-                          Join Now
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                <SectionLabel label="Live now" icon="sensors" />
+                <div className="space-y-2">
+                  {live.map(exam => {
+                    const submitted = exam.sessionStatus === 'SUBMITTED' || exam.sessionStatus === 'AUTO_SUBMITTED';
+                    return (
+                      <ExamCard
+                        key={exam._id}
+                        title={exam.title}
+                        sub={`${exam.group} · ${exam.duration} min${exam.scheduledAt ? ` · Ends ${formatTime(new Date(new Date(exam.scheduledAt).getTime() + exam.duration * 60000).toISOString())}` : ''}`}
+                        icon={submitted ? 'task_alt' : 'sensors'}
+                        iconBg={submitted ? 'var(--success-light)' : 'var(--danger-light)'}
+                        iconColor={submitted ? 'var(--success)' : 'var(--danger)'}
+                        borderColor={submitted ? 'var(--border)' : 'var(--danger-muted)'}
+                        onClick={() => !submitted && navigate(`/live-exam/${exam._id}`)}
+                        disabled={submitted}
+                        right={
+                          submitted
+                            ? <Badge variant="green" size="sm" dot>Submitted</Badge>
+                            : <Button variant="danger" size="sm" onClick={e => { e.stopPropagation(); navigate(`/live-exam/${exam._id}`); }}>Join Now</Button>
+                        }
+                      />
+                    );
+                  })}
                 </div>
               </section>
             )}
 
-            {/* ── UPCOMING EXAMS ── */}
+            {/* Upcoming */}
             <section>
-              <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">Scheduled & Upcoming</h2>
-              </div>
+              <SectionLabel label="Scheduled & Upcoming" icon="event" />
               {upcoming.length === 0 ? (
-                <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center">
-                  <Clock size={28} className="text-gray-200 mx-auto mb-2" />
-                  <p className="text-sm font-medium text-gray-500">No upcoming exams scheduled right now.</p>
-                </div>
+                <EmptyCard
+                  illustration={<EmptyExamsIllustration className="w-28 h-28 mx-auto mb-3" />}
+                  title="No upcoming exams"
+                  sub="Your scheduled exams will appear here."
+                />
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {upcoming.map(exam => {
                     const lobbyOpen = exam.scheduledAt
                       ? new Date(new Date(exam.scheduledAt).getTime() - (exam.loginWindowMinutes || 15) * 60000)
                       : null;
                     return (
-                      <div
+                      <ExamCard
                         key={exam._id}
+                        title={exam.title}
+                        sub={`${exam.group} · ${exam.duration} min${lobbyOpen ? ` · Lobby ${formatTime(lobbyOpen.toISOString())}` : ''}`}
+                        icon="event"
+                        iconBg="var(--accent-light)"
+                        iconColor="var(--accent)"
+                        borderColor="var(--border)"
                         onClick={() => navigate(`/live-exam/${exam._id}`)}
-                        className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between gap-4 cursor-pointer hover:border-gray-200 hover:shadow-sm transition-all group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
-                            <Clock size={18} className="text-blue-500" />
+                        right={
+                          <div className="text-right">
+                            <p style={{ color: 'var(--text-sub)' }} className="text-[12px] font-medium">{formatDate(exam.scheduledAt)}</p>
+                            <Countdown targetDate={exam.scheduledAt} />
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">{exam.title}</p>
-                            <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                              {exam.group} · {exam.duration} min
-                              {lobbyOpen && ` · Lobby opens ${formatTime(lobbyOpen.toISOString())}`}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <Countdown targetDate={exam.scheduledAt} />
-                          <ChevronRight size={14} className="text-gray-300 group-hover:text-gray-500 transition-colors ml-auto mt-0.5" />
-                        </div>
-                      </div>
+                        }
+                      />
                     );
                   })}
                 </div>
@@ -234,97 +247,143 @@ export function StudentDashboard() {
           </div>
         )}
 
-        {/* TAB 2: PAST EXAMS */}
+        {/* ── PAST TAB ─────────────────────────────────────────────── */}
         {activeTab === 'past' && (
-          <section className="space-y-3">
+          <section>
             {completed.length === 0 ? (
-              <div className="bg-white border border-gray-100 rounded-2xl p-12 text-center">
-                <Award size={32} className="text-gray-200 mx-auto mb-2" />
-                <p className="text-sm font-medium text-gray-500">No past exams found.</p>
-                <p className="text-xs text-gray-400 mt-0.5">Completed exams will appear here once finished.</p>
-              </div>
+              <EmptyCard
+                illustration={<TrophyIllustration className="w-28 h-28 mx-auto mb-3" />}
+                title="No past exams yet"
+                sub="Completed exams and results will appear here."
+              />
             ) : (
-              <div className="space-y-3">
-                {completed.map(exam => {
-                  const attended = exam.sessionStatus !== null && exam.sessionStatus !== 'ABSENT';
-
-                  return (
-                    <div
-                      key={exam._id}
-                      onClick={() => {
-                        if (attended && exam.isResultPublished) {
-                          navigate(`/student/result/${exam._id}`);
-                        } else if (attended && !exam.isResultPublished) {
-                          toast('Result is yet to be published by the coordinator.', { icon: '⏳' });
-                        }
-                      }}
-                      className={`bg-white border rounded-2xl p-4 flex items-center justify-between gap-4 transition-all ${
-                        attended && exam.isResultPublished
-                          ? 'border-gray-200/80 hover:border-emerald-300 hover:shadow-md cursor-pointer group'
-                          : 'border-gray-100 opacity-90 cursor-default'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                          attended ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'
-                        }`}>
-                          {attended ? <CheckCircle2 size={18} /> : <Calendar size={18} />}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="text-sm font-bold text-gray-900 truncate">{exam.title}</p>
-                            <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-mono">
-                              {exam.group}
-                            </span>
-                          </div>
-                          <p className="text-xs text-gray-400 mt-1 font-mono flex items-center gap-2">
-                            <span>{exam.duration} min</span>
-                            <span>·</span>
-                            <span>Completed {new Date(exam.scheduledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Status Badges & Action */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        {attended ? (
-                          <>
-                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
-                              Attended ✓
-                            </span>
-                            {exam.isResultPublished ? (
-                              <button
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  navigate(`/student/result/${exam._id}`);
-                                }}
-                                className="bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-1.5"
-                              >
-                                <span>View Result</span>
-                                <ChevronRight size={14} />
-                              </button>
-                            ) : (
-                              <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-                                <AlertCircle size={14} className="text-amber-500" />
-                                <span>Result yet to be published</span>
-                              </span>
-                            )}
-                          </>
-                        ) : (
-                          <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-xl">
-                            Unattended
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="card overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Exam</th>
+                      <th>Group</th>
+                      <th>Date</th>
+                      <th>Duration</th>
+                      <th>Status</th>
+                      <th>Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {completed.map(exam => {
+                      const attended = exam.sessionStatus !== null && exam.sessionStatus !== 'ABSENT';
+                      const canView  = attended && exam.isResultPublished;
+                      return (
+                        <tr
+                          key={exam._id}
+                          onClick={() => {
+                            if (canView) navigate(`/student/result/${exam._id}`);
+                            else if (attended && !exam.isResultPublished) toast('Result not yet published.', { icon: '⏳' });
+                          }}
+                          className={canView ? 'cursor-pointer' : 'cursor-default'}
+                        >
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div style={{ background: attended ? 'var(--success-light)' : 'var(--surface-sub)' }}
+                                className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0">
+                                <Icon name={attended ? 'task_alt' : 'event_busy'} size={15}
+                                  style={{ color: attended ? 'var(--success)' : 'var(--text-muted)' }} />
+                              </div>
+                              <span style={{ color: 'var(--text)' }} className="font-semibold">{exam.title}</span>
+                            </div>
+                          </td>
+                          <td><Badge variant="indigo" size="sm">{exam.group}</Badge></td>
+                          <td style={{ color: 'var(--text-muted)' }} className="font-mono text-[12px]">{formatDate(exam.scheduledAt)}</td>
+                          <td style={{ color: 'var(--text-muted)' }}>{exam.duration} min</td>
+                          <td>
+                            {attended
+                              ? <Badge variant="green" size="sm" dot>Attended</Badge>
+                              : <Badge variant="default" size="sm">Absent</Badge>}
+                          </td>
+                          <td>
+                            {attended ? (
+                              exam.isResultPublished
+                                ? <Button variant="outline" size="sm" rightIcon={<Icon name="chevron_right" size={14} />}
+                                    onClick={e => { e.stopPropagation(); navigate(`/student/result/${exam._id}`); }}>View</Button>
+                                : <Badge variant="amber" size="sm" dot>Pending</Badge>
+                            ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </section>
         )}
-
       </div>
     </DashboardLayout>
+  );
+}
+
+/* ── Sub-components ──────────────────────────────────────────────────────── */
+
+function StatChip({ icon, label, color, bgColor }: { icon: string; label: string; color: string; bgColor: string }) {
+  return (
+    <div style={{ background: bgColor, border: `1px solid ${color}22` }}
+      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold">
+      <Icon name={icon} size={14} style={{ color }} />
+      <span style={{ color }}>{label}</span>
+    </div>
+  );
+}
+
+function LiveChip({ count }: { count: number }) {
+  return (
+    <div style={{ background: 'var(--danger-light)', border: '1px solid var(--danger-muted)' }}
+      className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold">
+      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" style={{ animationName: 'pulse-dot' }} />
+      <span style={{ color: 'var(--danger)' }}>{count} Live Now</span>
+    </div>
+  );
+}
+
+function ExamCard({
+  title, sub, icon, iconBg, iconColor, borderColor, onClick, disabled, right,
+}: {
+  title: string; sub: string; icon: string; iconBg: string; iconColor: string;
+  borderColor: string; onClick: () => void; disabled?: boolean; right: React.ReactNode;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      style={{ background: 'var(--surface)', borderColor }}
+      className={[
+        'card flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-all',
+        !disabled && 'cursor-pointer card-hover',
+        disabled && 'opacity-65',
+      ].join(' ')}
+    >
+      <div className="flex items-center gap-3 min-w-0">
+        <div style={{ background: iconBg }} className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0">
+          <Icon name={icon} size={18} style={{ color: iconColor }} />
+        </div>
+        <div className="min-w-0">
+          <p style={{ color: 'var(--text)' }} className="text-[14px] font-semibold truncate">{title}</p>
+          <p style={{ color: 'var(--text-muted)' }} className="text-[12px] mt-0.5">{sub}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 justify-end pt-3 sm:pt-0 border-t sm:border-0 border-[var(--border)] w-full sm:w-auto">
+        {right}
+      </div>
+    </div>
+  );
+}
+
+function EmptyCard({ illustration, title, sub }: { illustration: React.ReactNode; title: string; sub: string }) {
+  return (
+    <div style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }} className="card py-14 text-center">
+      <div style={{ color: 'var(--text)' }}>{illustration}</div>
+      <p style={{ color: 'var(--text-sub)' }} className="text-[14px] font-semibold">{title}</p>
+      <p style={{ color: 'var(--text-muted)' }} className="text-[13px] mt-1">{sub}</p>
+    </div>
   );
 }

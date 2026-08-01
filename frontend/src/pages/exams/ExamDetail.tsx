@@ -7,7 +7,7 @@ import {
   Loader2, ArrowLeft, Plus, CheckCircle2, Lock,
   Trash2, Clock, Calendar, ChevronDown, ChevronUp,
   FlaskConical, Atom, Calculator, Leaf, Zap, AlertCircle,
-  CheckCheck, Radio, Pencil, X, Save, Info, Trophy
+  CheckCheck, Radio, Pencil, X, Save, Info, Trophy, ImagePlus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,8 @@ import toast from 'react-hot-toast';
 type Question = {
   _id: string;
   text: string;
+  diagramUrl?: string;
+  diagramUrls?: string[];
   options: string[];
   correctAnswer: string;
   marks: number;
@@ -25,6 +27,8 @@ type Question = {
 type Section = {
   subject: string;
   status: 'PENDING' | 'IN_PROGRESS' | 'READY';
+  defaultMarks?: number;
+  defaultNegativeMarks?: number;
   questions: Question[];
 };
 
@@ -40,13 +44,14 @@ type Exam = {
   defaultMarks: number;
   defaultNegativeMarks: number;
   coordinatorCpId?: string;
-  classDefaultCoordinatorCpId?: string;
   isClassDefaultCoordinator?: boolean;
   sections: Section[];
 };
 
 type QForm = {
   text: string;
+  diagramUrl?: string;
+  diagramUrls: string[];
   options: [string, string, string, string];
   correctAnswer: 'A' | 'B' | 'C' | 'D';
   marks: number;
@@ -55,6 +60,8 @@ type QForm = {
 
 const makeEmptyForm = (defaultMarks = 4, defaultNegativeMarks = 1): QForm => ({
   text: '',
+  diagramUrl: '',
+  diagramUrls: [],
   options: ['', '', '', ''],
   correctAnswer: 'A',
   marks: defaultMarks,
@@ -101,6 +108,58 @@ function QuestionForm({
   defaultMarks?: number;
   defaultNegativeMarks?: number;
 }) {
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const res = await api.post('/upload/presign', {
+        fileName: file.name,
+        contentType: file.type
+      });
+      
+      const { presignedUrl, publicUrl } = res.data;
+      
+      await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type }
+      });
+      
+      onChange({ ...value, diagramUrls: [...value.diagramUrls, publicUrl] });
+      toast.success('Diagram uploaded!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to upload image. Check AWS credentials.');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveImage = async (urlToRemove: string) => {
+    try {
+      await api.delete('/upload/diagram', { data: { url: urlToRemove } });
+      onChange({ 
+        ...value, 
+        diagramUrls: value.diagramUrls.filter(u => u !== urlToRemove),
+        diagramUrl: value.diagramUrl === urlToRemove ? '' : value.diagramUrl
+      });
+      toast.success('Image removed');
+    } catch (err) {
+      toast.error('Failed to remove image from server');
+    }
+  };
+
   const setOption = (i: number, val: string) => {
     const opts = [...value.options] as [string, string, string, string];
     opts[i] = val;
@@ -123,6 +182,54 @@ function QuestionForm({
           placeholder="Write the question clearly. Include all necessary context the student needs."
           className="w-full bg-gray-50 border border-gray-100 focus:border-gray-300 focus:bg-white rounded-xl px-4 py-3 outline-none text-sm font-medium text-gray-800 placeholder-gray-300 resize-none transition-colors leading-relaxed"
         />
+
+        {/* Diagram Upload */}
+        <div className="mt-3">
+          <div className="flex flex-wrap gap-3 mb-3">
+            {value.diagramUrl && !value.diagramUrls.includes(value.diagramUrl) && (
+              <div className="relative inline-block border rounded-lg overflow-hidden group bg-white shadow-sm">
+                <img src={value.diagramUrl} alt="Question diagram" className="max-h-40 object-contain" />
+                <button 
+                  type="button"
+                  onClick={() => handleRemoveImage(value.diagramUrl!)}
+                  className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            )}
+            {value.diagramUrls.map(url => (
+              <div key={url} className="relative inline-block border rounded-lg overflow-hidden group bg-white shadow-sm">
+                <img src={url} alt="Question diagram" className="max-h-40 object-contain" />
+                <button 
+                  type="button"
+                  onClick={() => handleRemoveImage(url)}
+                  className="absolute top-1 right-1 bg-red-500 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingImage}
+            className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors inline-flex"
+          >
+            {uploadingImage ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+            {uploadingImage ? 'Uploading...' : 'Attach Image'}
+          </button>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleImageUpload} 
+            accept="image/*" 
+            className="hidden" 
+          />
+        </div>
       </div>
 
       {/* Options */}
@@ -416,7 +523,9 @@ export function ExamDetail() {
     setAdding(false);
     setEditDraft({
       text: q.text,
-      options: q.options as [string, string, string, string],
+      diagramUrl: q.diagramUrl || '',
+      diagramUrls: q.diagramUrls || [],
+      options: [...q.options] as [string, string, string, string],
       correctAnswer: q.correctAnswer as 'A' | 'B' | 'C' | 'D',
       marks: q.marks,
       negativeMarks: q.negativeMarks,
@@ -493,6 +602,24 @@ export function ExamDetail() {
       toast.error(err.response?.data?.error || 'Failed to publish');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleUpdateSectionMeta = async (subject: string, updates: { defaultMarks?: number; defaultNegativeMarks?: number }) => {
+    try {
+      const res = await api.patch(`/exams/${id}/sections/${subject}`, updates);
+      setExam(prev => {
+        if (!prev) return prev;
+        const newSections = [...prev.sections];
+        const idx = newSections.findIndex(s => s.subject === subject);
+        if (idx !== -1) {
+          newSections[idx] = { ...newSections[idx], ...updates };
+        }
+        return { ...prev, sections: newSections };
+      });
+      toast.success('Section grading updated');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update section grading');
     }
   };
 
@@ -681,9 +808,7 @@ export function ExamDetail() {
                     className="w-full bg-gray-50 border border-gray-100 focus:border-gray-300 rounded-xl px-4 py-3 outline-none text-sm font-semibold text-gray-700 transition-colors bg-transparent cursor-pointer"
                   >
                     <option value="">
-                      {exam.classDefaultCoordinatorCpId 
-                        ? `Use Class Default: ${staff.find(s => s.cpId === exam.classDefaultCoordinatorCpId)?.name || exam.classDefaultCoordinatorCpId}`
-                        : 'Select Coordinator...'}
+                      Unassigned
                     </option>
                     {staff.map(s => (
                       <option key={s.cpId} value={s.cpId}>
@@ -791,7 +916,7 @@ export function ExamDetail() {
             return (
               <button
                 key={s.subject}
-                onClick={() => { setActiveTab(s.subject); setAdding(false); setAddDraft(makeEmptyForm(exam?.defaultMarks, exam?.defaultNegativeMarks)); setEditingQId(null); }}
+                onClick={() => { setActiveTab(s.subject); setAdding(false); setAddDraft(makeEmptyForm(s.defaultMarks ?? exam?.defaultMarks, s.defaultNegativeMarks ?? exam?.defaultNegativeMarks)); setEditingQId(null); }}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border ${
                   isActive ? 'bg-gray-900 text-white border-gray-900 shadow-sm' : 'bg-white text-gray-600 border-gray-100 hover:border-gray-200'
                 }`}
@@ -818,6 +943,41 @@ export function ExamDetail() {
                 <span className="text-sm font-semibold text-emerald-700">
                   {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} section approved — {activeSection.questions.length} questions locked in.
                 </span>
+              </div>
+            )}
+
+            {/* Section Grading Settings */}
+            {canEdit && activeSection.status !== 'READY' && (
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-5 transition-shadow hover:shadow-sm">
+                <div className="flex-1">
+                  <h3 className="text-gray-900 text-[15px] font-medium flex items-center gap-2 mb-1">
+                    <Calculator size={16} className="text-gray-500" />
+                    Section Default Marks
+                  </h3>
+                  <p className="text-gray-500 text-[13px] leading-relaxed">
+                    Set default marks for this section. Existing questions will be automatically updated.
+                  </p>
+                </div>
+                <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex flex-col">
+                    <label className="text-[11px] font-medium text-gray-500 mb-1.5 ml-1">Correct (+)</label>
+                    <input
+                      type="number" min={1}
+                      value={activeSection.defaultMarks ?? exam.defaultMarks}
+                      onChange={e => handleUpdateSectionMeta(activeSection.subject, { defaultMarks: Number(e.target.value) })}
+                      className="w-20 bg-gray-50 border border-gray-200 text-gray-900 text-sm font-medium rounded-lg px-3 py-2 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-[11px] font-medium text-gray-500 mb-1.5 ml-1">Incorrect (-)</label>
+                    <input
+                      type="number" min={0} step={0.25}
+                      value={activeSection.defaultNegativeMarks ?? exam.defaultNegativeMarks}
+                      onChange={e => handleUpdateSectionMeta(activeSection.subject, { defaultNegativeMarks: Number(e.target.value) })}
+                      className="w-20 bg-gray-50 border border-gray-200 text-gray-900 text-sm font-medium rounded-lg px-3 py-2 outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
@@ -853,12 +1013,12 @@ export function ExamDetail() {
                       value={addDraft}
                       onChange={setAddDraft}
                       onSubmit={handleAddQuestion}
-                      onCancel={() => { setAdding(false); setAddDraft(makeEmptyForm(exam?.defaultMarks, exam?.defaultNegativeMarks)); }}
+                      onCancel={() => { setAdding(false); setAddDraft(makeEmptyForm(activeSection.defaultMarks ?? exam?.defaultMarks, activeSection.defaultNegativeMarks ?? exam?.defaultNegativeMarks)); }}
                       submitLabel="Add Question"
                       loading={actionLoading === 'add'}
                       textRef={addTextRef}
-                      defaultMarks={exam.defaultMarks}
-                      defaultNegativeMarks={exam.defaultNegativeMarks}
+                      defaultMarks={activeSection.defaultMarks ?? exam.defaultMarks}
+                      defaultNegativeMarks={activeSection.defaultNegativeMarks ?? exam.defaultNegativeMarks}
                     />
                   </div>
                 )}
@@ -942,6 +1102,18 @@ export function ExamDetail() {
                       {/* Expanded view (read-only) */}
                       {isExpanded && !isEditing && (
                         <div className="border-t border-gray-50 px-4 pb-4 pt-3 space-y-3">
+                          {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
+                            <div className="mb-3 flex justify-center">
+                              <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white" />
+                            </div>
+                          )}
+                          {q.diagramUrls && q.diagramUrls.length > 0 && (
+                            <div className="mb-3 flex flex-wrap gap-3 justify-center">
+                              {q.diagramUrls.map(url => (
+                                <img key={url} src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white" />
+                              ))}
+                            </div>
+                          )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {q.options.map((opt, oi) => {
                               const letter = String.fromCharCode(65 + oi);

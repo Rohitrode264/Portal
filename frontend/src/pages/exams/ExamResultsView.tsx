@@ -2,8 +2,11 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, ArrowLeft, Trophy, Users, Award, CheckCircle2, AlertCircle, Share2, EyeOff } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Award, CheckCircle2, AlertCircle, Share2, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
 
 type RosterItem = {
   studentCpId: string;
@@ -40,6 +43,27 @@ type ResultData = {
   roster: RosterItem[];
 };
 
+function StatCard({ label, value, sub, icon, color }: {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <div className="bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[12px] font-medium text-gray-400">{label}</span>
+        <span className={color}>{icon}</span>
+      </div>
+      <p className="text-[22px] font-bold text-gray-900 leading-none">
+        {value}
+        {sub && <span className="text-[13px] font-normal text-gray-400 ml-1.5">{sub}</span>}
+      </p>
+    </div>
+  );
+}
+
 export function ExamResultsView() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -48,9 +72,7 @@ export function ExamResultsView() {
   const [publishing, setPublishing] = useState(false);
   const [filterSubj, setFilterSubj] = useState<string>('ALL');
 
-  useEffect(() => {
-    fetchResults();
-  }, [id]);
+  useEffect(() => { fetchResults(); }, [id]);
 
   const fetchResults = async () => {
     try {
@@ -66,23 +88,16 @@ export function ExamResultsView() {
   const handleTogglePublish = async () => {
     if (!data) return;
     const nextState = !data.exam.isResultPublished;
-    const promptMsg = nextState
-      ? 'Are you sure you want to PUBLISH these results? Students will immediately be able to view their scores, ranks, percentiles, and detailed question mistakes.'
-      : 'Are you sure you want to UNPUBLISH these results? Students will no longer see their scores.';
-
-    if (!window.confirm(promptMsg)) return;
+    const msg = nextState
+      ? 'Publish results? Students will immediately see scores, ranks, and mistakes.'
+      : 'Unpublish results? Students will no longer see their scores.';
+    if (!window.confirm(msg)) return;
 
     setPublishing(true);
     try {
       const res = await api.post(`/exams/${id}/publish-result`, { publish: nextState });
       toast.success(res.data.message || 'Updated result publication status');
-      setData({
-        ...data,
-        exam: {
-          ...data.exam,
-          isResultPublished: nextState
-        }
-      });
+      setData({ ...data, exam: { ...data.exam, isResultPublished: nextState } });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to update result publication');
     } finally {
@@ -91,13 +106,7 @@ export function ExamResultsView() {
   };
 
   if (loading || !data) {
-    return (
-      <DashboardLayout>
-        <div className="flex justify-center py-20">
-          <Loader2 className="animate-spin text-gray-300" size={28} />
-        </div>
-      </DashboardLayout>
-    );
+    return <DashboardLayout><LoadingSpinner fullPage /></DashboardLayout>;
   }
 
   const { exam, summary, roster } = data;
@@ -105,212 +114,181 @@ export function ExamResultsView() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-6xl mx-auto">
-        {/* Top bar */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
+      <div className="space-y-5 max-w-5xl">
+
+        {/* Header */}
+        <div className="flex items-start justify-between flex-wrap gap-3">
+          <div className="flex items-start gap-3">
             <button
               onClick={() => navigate(-1)}
-              className="p-2 bg-white border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors"
+              className="mt-0.5 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
             >
-              <ArrowLeft size={16} className="text-gray-600" />
+              <ArrowLeft size={16} />
             </button>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-lg font-bold text-gray-900">{exam.title} — Results</h1>
-                <span className="text-xs font-semibold bg-purple-50 text-purple-700 px-2 py-0.5 rounded-md">
-                  {exam.group}
-                </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-[20px] font-bold text-gray-900 tracking-tight leading-none">
+                  {exam.title}
+                </h1>
+                <Badge variant="purple" size="sm">{exam.group}</Badge>
               </div>
-              <p className="text-xs text-gray-400 mt-0.5">{exam.className}</p>
+              <p className="text-[13px] text-gray-400 mt-1.5">{exam.className} · Results</p>
             </div>
           </div>
 
-          {/* Publish Result Button */}
-          <button
+          <Button
+            variant={exam.isResultPublished ? 'outline' : 'success'}
+            size="md"
+            isLoading={publishing}
+            leftIcon={exam.isResultPublished ? <EyeOff size={14} /> : <Share2 size={14} />}
             onClick={handleTogglePublish}
-            disabled={publishing}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-xs transition-all shadow-sm ${
-              exam.isResultPublished
-                ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                : 'bg-emerald-600 text-white hover:bg-emerald-700'
-            }`}
           >
-            {publishing ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : exam.isResultPublished ? (
-              <>
-                <EyeOff size={15} />
-                <span>Result Published (Click to Unpublish)</span>
-              </>
-            ) : (
-              <>
-                <Share2 size={15} />
-                <span>Publish Result to Students</span>
-              </>
-            )}
-          </button>
+            {exam.isResultPublished ? 'Unpublish Results' : 'Publish Results'}
+          </Button>
         </div>
 
-        {/* Summary Stats Banner */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-100 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-gray-400 mb-1">
-              <span className="text-xs font-medium">Total Attended</span>
-              <Users size={16} className="text-blue-500" />
-            </div>
-            <p className="text-xl font-bold text-gray-900">
-              {summary.totalAttended} <span className="text-xs font-normal text-gray-400">/ {summary.totalStudents}</span>
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-gray-400 mb-1">
-              <span className="text-xs font-medium">Highest Score</span>
-              <Trophy size={16} className="text-amber-500" />
-            </div>
-            <p className="text-xl font-bold text-gray-900">
-              {summary.highestScore} <span className="text-xs font-normal text-gray-400">/ {exam.maxMarks}</span>
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-gray-400 mb-1">
-              <span className="text-xs font-medium">Class Average</span>
-              <Award size={16} className="text-purple-500" />
-            </div>
-            <p className="text-xl font-bold text-gray-900">
-              {summary.averageScore} <span className="text-xs font-normal text-gray-400">marks</span>
-            </p>
-          </div>
-
-          <div className="bg-white border border-gray-100 rounded-2xl p-4">
-            <div className="flex items-center justify-between text-gray-400 mb-1">
-              <span className="text-xs font-medium">Publication Status</span>
-              {exam.isResultPublished ? <CheckCircle2 size={16} className="text-emerald-500" /> : <AlertCircle size={16} className="text-amber-500" />}
-            </div>
-            <p className="text-sm font-bold mt-1">
-              {exam.isResultPublished ? (
-                <span className="text-emerald-600">Visible to Students</span>
-              ) : (
-                <span className="text-amber-600">Hidden (Draft)</span>
-              )}
-            </p>
-          </div>
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard
+            label="Attendance"
+            value={summary.totalAttended}
+            sub={`/ ${summary.totalStudents}`}
+            icon={<Users size={15} />}
+            color="text-blue-500"
+          />
+          <StatCard
+            label="Highest Score"
+            value={summary.highestScore}
+            sub={`/ ${exam.maxMarks}`}
+            icon={<Trophy size={15} />}
+            color="text-amber-500"
+          />
+          <StatCard
+            label="Class Average"
+            value={summary.averageScore}
+            sub="marks"
+            icon={<Award size={15} />}
+            color="text-purple-500"
+          />
+          <StatCard
+            label="Publication"
+            value={exam.isResultPublished ? 'Published' : 'Hidden'}
+            icon={exam.isResultPublished ? <CheckCircle2 size={15} /> : <AlertCircle size={15} />}
+            color={exam.isResultPublished ? 'text-emerald-500' : 'text-amber-500'}
+          />
         </div>
 
-        {/* Filter subject tab if needed */}
-        <div className="flex items-center justify-between bg-white border border-gray-100 rounded-xl p-2">
-          <div className="flex items-center gap-1 overflow-x-auto">
+        {/* Subject Filter Tabs */}
+        <div className="bg-white border border-gray-100 rounded-xl p-1.5 flex items-center gap-1 overflow-x-auto shadow-sm">
+          {['ALL', ...subjects].map(subj => (
             <button
-              onClick={() => setFilterSubj('ALL')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                filterSubj === 'ALL' ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
-              }`}
+              key={subj}
+              onClick={() => setFilterSubj(subj)}
+              className={[
+                'px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all',
+                filterSubj === subj
+                  ? 'bg-gray-900 text-white'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800',
+              ].join(' ')}
             >
-              Overall Ranking & Percentiles
+              {subj === 'ALL' ? 'Overall' : subj.charAt(0) + subj.slice(1).toLowerCase()}
             </button>
-            {subjects.map(s => (
-              <button
-                key={s}
-                onClick={() => setFilterSubj(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                  filterSubj === s ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {s.charAt(0) + s.slice(1).toLowerCase()} Only
-              </button>
-            ))}
+          ))}
+          <div className="ml-auto pl-3 shrink-0">
+            <span className="text-[12px] text-gray-400 font-mono">{roster.length} students</span>
           </div>
-          <span className="text-xs text-gray-400 px-2 font-mono">{roster.length} students listed</span>
         </div>
 
-        {/* Roster Table */}
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+        {/* Results Table */}
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-100 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
-                  <th className="py-3.5 px-4 w-16 text-center">Rank</th>
-                  <th className="py-3.5 px-4">Student</th>
-                  <th className="py-3.5 px-4">Status</th>
-                  <th className="py-3.5 px-4 text-right">
-                    {filterSubj === 'ALL' ? 'Total Score' : `${filterSubj} Score`}
+                <tr className="bg-gray-50/80 border-b border-gray-100">
+                  <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-center w-14">Rank</th>
+                  <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Student</th>
+                  <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-right">
+                    {filterSubj === 'ALL' ? 'Score' : `${filterSubj.charAt(0) + filterSubj.slice(1).toLowerCase()}`}
                   </th>
-                  {filterSubj === 'ALL' && <th className="py-3.5 px-4 text-right">Percentile</th>}
-                  <th className="py-3.5 px-4 text-center">Correct / Wrong / Unattempted</th>
+                  {filterSubj === 'ALL' && (
+                    <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-right">
+                      %ile
+                    </th>
+                  )}
+                  <th className="py-3 px-4 text-[11px] font-semibold text-gray-400 uppercase tracking-wider text-center">
+                    ✓ / ✗ / —
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50 text-sm">
+              <tbody className="divide-y divide-gray-50">
                 {roster.map((r) => {
                   const subjData = filterSubj === 'ALL' ? null : r.subjectScores[filterSubj];
-                  const displayScore = filterSubj === 'ALL' ? r.totalScore : (subjData?.score ?? 0);
-                  const displayCorrect = filterSubj === 'ALL' ? r.correctCount : (subjData?.correct ?? 0);
-                  const displayWrong = filterSubj === 'ALL' ? r.wrongCount : (subjData?.wrong ?? 0);
-                  const displayUnattempted = filterSubj === 'ALL' ? r.unattemptedCount : (subjData?.unattempted ?? 0);
+                  const score = filterSubj === 'ALL' ? r.totalScore : (subjData?.score ?? 0);
+                  const correct = filterSubj === 'ALL' ? r.correctCount : (subjData?.correct ?? 0);
+                  const wrong = filterSubj === 'ALL' ? r.wrongCount : (subjData?.wrong ?? 0);
+                  const unatt = filterSubj === 'ALL' ? r.unattemptedCount : (subjData?.unattempted ?? 0);
 
                   return (
                     <tr
                       key={r.studentCpId}
-                      className={`hover:bg-gray-50/50 transition-colors ${!r.attended ? 'opacity-50 bg-gray-50/20' : ''}`}
+                      className={[
+                        'hover:bg-gray-50/50 transition-colors',
+                        !r.attended ? 'opacity-50' : '',
+                      ].join(' ')}
                     >
                       {/* Rank */}
-                      <td className="py-3.5 px-4 text-center font-mono font-bold">
+                      <td className="py-3.5 px-4 text-center">
                         {r.attended && r.rank ? (
-                          <span
-                            className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs ${
-                              r.rank === 1 ? 'bg-amber-100 text-amber-800 border border-amber-300' :
-                              r.rank === 2 ? 'bg-slate-100 text-slate-700 border border-slate-300' :
-                              r.rank === 3 ? 'bg-orange-100 text-orange-800 border border-orange-300' :
-                              'text-gray-600'
-                            }`}
-                          >
+                          <span className={[
+                            'inline-flex items-center justify-center w-6 h-6 rounded-full text-[11px] font-bold',
+                            r.rank === 1 ? 'bg-amber-100 text-amber-800' :
+                            r.rank === 2 ? 'bg-slate-100 text-slate-700' :
+                            r.rank === 3 ? 'bg-orange-100 text-orange-800' :
+                            'text-gray-500 bg-gray-50',
+                          ].join(' ')}>
                             {r.rank}
                           </span>
                         ) : (
-                          <span className="text-gray-300">—</span>
+                          <span className="text-gray-300 text-[13px]">—</span>
                         )}
                       </td>
 
                       {/* Student */}
                       <td className="py-3.5 px-4">
-                        <p className="font-semibold text-gray-900">{r.name}</p>
-                        <p className="text-xs text-gray-400 font-mono">{r.studentCpId}</p>
+                        <p className="text-[13px] font-semibold text-gray-900">{r.name}</p>
+                        <p className="text-[11px] text-gray-400 font-mono">{r.studentCpId}</p>
                       </td>
 
                       {/* Status */}
                       <td className="py-3.5 px-4">
-                        {r.attended ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg">
-                            <CheckCircle2 size={13} /> Attended
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 bg-gray-100 px-2.5 py-1 rounded-lg">
-                            Unattended
-                          </span>
-                        )}
+                        {r.attended
+                          ? <Badge variant="green" size="sm">Attended</Badge>
+                          : <Badge variant="default" size="sm">Absent</Badge>
+                        }
                       </td>
 
                       {/* Score */}
-                      <td className="py-3.5 px-4 text-right font-mono">
+                      <td className="py-3.5 px-4 text-right">
                         {r.attended ? (
-                          <span className="font-bold text-gray-900 text-base">
-                            {displayScore} <span className="text-xs font-normal text-gray-400">/ {filterSubj === 'ALL' ? r.maxMarks : '—'}</span>
+                          <span className="text-[15px] font-bold text-gray-900 font-mono">
+                            {score}
+                            {filterSubj === 'ALL' && (
+                              <span className="text-[11px] font-normal text-gray-400 ml-1">/{r.maxMarks}</span>
+                            )}
                           </span>
                         ) : (
-                          <span className="text-gray-300 font-mono">0</span>
+                          <span className="text-gray-300 font-mono text-[13px]">0</span>
                         )}
                       </td>
 
                       {/* Percentile */}
                       {filterSubj === 'ALL' && (
-                        <td className="py-3.5 px-4 text-right font-mono">
+                        <td className="py-3.5 px-4 text-right">
                           {r.attended && r.percentile !== null ? (
-                            <span className="font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg text-xs">
-                              {r.percentile.toFixed(2)}%ile
-                            </span>
+                            <Badge variant="blue" size="sm">{r.percentile.toFixed(1)}%ile</Badge>
                           ) : (
-                            <span className="text-gray-300">—</span>
+                            <span className="text-gray-300 text-[12px]">—</span>
                           )}
                         </td>
                       )}
@@ -318,15 +296,15 @@ export function ExamResultsView() {
                       {/* Stats */}
                       <td className="py-3.5 px-4 text-center">
                         {r.attended ? (
-                          <div className="inline-flex items-center gap-2 text-xs font-mono bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">
-                            <span className="text-emerald-600 font-bold">+{displayCorrect}</span>
-                            <span className="text-gray-300">/</span>
-                            <span className="text-red-500 font-bold">-{displayWrong}</span>
-                            <span className="text-gray-300">/</span>
-                            <span className="text-gray-400">○{displayUnattempted}</span>
-                          </div>
+                          <span className="inline-flex items-center gap-1.5 text-[12px] font-mono bg-gray-50 px-2.5 py-1 rounded-lg">
+                            <span className="text-emerald-600 font-bold">+{correct}</span>
+                            <span className="text-gray-200">/</span>
+                            <span className="text-red-500 font-bold">−{wrong}</span>
+                            <span className="text-gray-200">/</span>
+                            <span className="text-gray-400">{unatt}</span>
+                          </span>
                         ) : (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-gray-300 text-[12px]">—</span>
                         )}
                       </td>
                     </tr>
@@ -336,6 +314,7 @@ export function ExamResultsView() {
             </table>
           </div>
         </div>
+
       </div>
     </DashboardLayout>
   );

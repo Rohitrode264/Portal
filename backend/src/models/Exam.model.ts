@@ -9,6 +9,8 @@ export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export interface IQuestion {
     _id?: Types.ObjectId;
     text: string;
+    diagramUrl?: string;
+    diagramUrls?: string[];
     options: [string, string, string, string];
     correctAnswer: 'A' | 'B' | 'C' | 'D';
     marks: number;
@@ -23,6 +25,8 @@ export interface IExamSection {
     status: SectionStatus;
     approvedAt?: Date;
     approvedBy?: string; // CP ID
+    defaultMarks?: number;
+    defaultNegativeMarks?: number;
     questions: IQuestion[];
 }
 
@@ -47,6 +51,8 @@ export interface IExam extends Document {
 
 const QuestionSchema = new Schema<IQuestion>({
     text: { type: String, required: true },
+    diagramUrl: { type: String },
+    diagramUrls: { type: [String], default: [] },
     options: {
         type: [String],
         required: true,
@@ -68,6 +74,8 @@ const ExamSectionSchema = new Schema<IExamSection>({
     status: { type: String, enum: ['PENDING', 'IN_PROGRESS', 'READY'], default: 'PENDING' },
     approvedAt: { type: Date },
     approvedBy: { type: String },
+    defaultMarks: { type: Number },
+    defaultNegativeMarks: { type: Number },
     questions: [QuestionSchema]
 });
 

@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import toast from 'react-hot-toast';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 
 type LoginStep = 'IDENTIFIER' | 'PASSWORD' | 'OTP' | 'FORGOT_INIT' | 'FORGOT_VERIFY';
@@ -205,13 +205,13 @@ export function LoginPage() {
         {/* Brand */}
         <div className="relative z-10 flex items-center gap-3">
           <img
-            src="/images/logo_red.jpg"
-            alt="NCP"
-            className="w-10 h-10 rounded-xl object-contain shadow-lg"
+            src="/images/merit_logo.png"
+            alt="Merit"
+            className="w-16 h-16 rounded-xl object-contain shadow-lg"
           />
           <div>
-            <div className="text-white font-black text-[16px] leading-none tracking-tight">New Career Point</div>
-            <div className="text-blue-400 text-[10px] font-bold uppercase tracking-[0.25em] mt-1">Learning Portal</div>
+            <div className="text-white font-black text-[20px] leading-none tracking-tight">Merit</div>
+            <div className="text-blue-400 text-[9.5px] font-bold uppercase tracking-[0.25em] mt-1.5">By New Career Point</div>
           </div>
         </div>
 
@@ -322,26 +322,29 @@ export function LoginPage() {
         {/* Bottom copyright */}
         <div className="relative z-10">
           <p className="text-neutral-600 text-xs font-medium">
-            © {new Date().getFullYear()} New Career Point. All rights reserved.
+            © {new Date().getFullYear()} Merit by New Career Point. All rights reserved.
           </p>
         </div>
       </div>
 
       {/* ── RIGHT — Form ── */}
-      <div className="flex-1 bg-gradient-to-br from-slate-50 via-blue-50/20 to-slate-100 flex flex-col">
+      <div className="flex-1 bg-[#f8fafc] relative flex flex-col overflow-hidden">
+        {/* Ambient background glows */}
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-200/20 rounded-full blur-[120px] -translate-y-1/4 translate-x-1/4 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-purple-200/20 rounded-full blur-[120px] translate-y-1/4 -translate-x-1/4 pointer-events-none" />
 
         {/* Mobile top bar */}
-        <div className="lg:hidden flex items-center gap-3 px-6 pt-8 pb-4">
-          <img src="/images/logo_red.jpg" alt="NCP" className="w-9 h-9 rounded-xl object-contain" />
+        <div className="lg:hidden flex items-center gap-3 px-6 pt-8 pb-4 relative z-10">
+          <img src="/images/merit_logo.png" alt="Merit" className="w-12 h-12 rounded-xl object-contain" />
           <div>
-            <div className="text-gray-900 font-black text-[15px] leading-none">New Career Point</div>
-            <div className="text-blue-500 text-[9px] font-bold uppercase tracking-[0.2em] mt-0.5">Learning Portal</div>
+            <div className="text-gray-900 font-black text-[18px] leading-none">Merit</div>
+            <div className="text-blue-500 text-[9px] font-bold uppercase tracking-[0.2em] mt-0.5">By New Career Point</div>
           </div>
         </div>
 
         {/* Centred form */}
-        <div className="flex-1 flex items-center justify-center px-6 py-12">
-          <div className="w-full max-w-[380px]">
+        <div className="flex-1 flex items-center justify-center px-6 py-12 relative z-10">
+          <div className="w-full max-w-[420px] bg-white/70 backdrop-blur-xl border border-white/80 p-8 sm:p-10 rounded-[32px] shadow-[0_8px_40px_rgb(0,0,0,0.04)]">
 
             {/* Step label + heading */}
             <AnimatePresence mode="wait">
@@ -574,11 +577,11 @@ export function LoginPage() {
             </AnimatePresence>
 
             {/* Footer note */}
-            <p className="mt-10 text-xs text-center text-gray-300 leading-relaxed">
+            <p className="mt-10 text-xs text-center text-gray-400 leading-relaxed">
               By continuing you agree to our{' '}
-              <a href="#" className="text-gray-400 hover:text-gray-600 font-semibold transition-colors">Terms</a>
+              <Link to="/terms" className="text-gray-500 hover:text-gray-800 font-semibold transition-colors">Terms</Link>
               {' & '}
-              <a href="#" className="text-gray-400 hover:text-gray-600 font-semibold transition-colors">Privacy Policy</a>.
+              <Link to="/privacy" className="text-gray-500 hover:text-gray-800 font-semibold transition-colors">Privacy Policy</Link>.
             </p>
           </div>
         </div>

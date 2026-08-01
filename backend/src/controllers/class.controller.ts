@@ -43,10 +43,12 @@ export class ClassController {
                     name: className,
                     academicYear: cls.academicYear,
                     pcm: {
-                        examCoordinatorCpId: pcmConfig?.examCoordinatorCpId || null
+                        classStrength: pcmConfig?.classStrength || 40,
+                        sections: pcmConfig?.sections || []
                     },
                     pcb: {
-                        examCoordinatorCpId: pcbConfig?.examCoordinatorCpId || null
+                        classStrength: pcbConfig?.classStrength || 40,
+                        sections: pcbConfig?.sections || []
                     }
                 };
             });
@@ -59,26 +61,48 @@ export class ClassController {
         }
     }
 
-    async assignCoordinator(req: Request, res: Response): Promise<void> {
+    async updateClassConfig(req: Request, res: Response): Promise<void> {
         try {
             const { classId } = req.params;
-            const { group, teacherCpId } = req.body;
+            const { group, classStrength, sectionName, coordinatorCpId } = req.body;
 
             if (!group || !['PCM', 'PCB'].includes(group)) {
                 res.status(400).json({ error: 'Valid group (PCM or PCB) is required' });
                 return;
             }
 
-            const config = await ClassConfig.findOneAndUpdate(
-                { classId, group },
-                { examCoordinatorCpId: teacherCpId },
-                { new: true, upsert: true }
-            );
+            let config = await ClassConfig.findOne({ classId, group });
+            
+            if (!config) {
+                config = new ClassConfig({ classId, group, classStrength: classStrength || 40, sections: [] });
+            }
 
-            res.json({ message: 'Coordinator assigned successfully', config });
+            if (classStrength !== undefined) {
+                config.classStrength = classStrength;
+            }
+
+            if (sectionName) {
+                const existingSectionIndex = config.sections.findIndex(s => s.sectionName === sectionName);
+                if (existingSectionIndex !== -1) {
+                    if (coordinatorCpId) {
+                        config.sections[existingSectionIndex].coordinatorCpId = coordinatorCpId;
+                    } else {
+                        // If coordinator is null/empty, we can remove or set it to null. 
+                        // Mongoose handles undefined/null well, but let's just clear it.
+                        (config.sections[existingSectionIndex] as any).coordinatorCpId = undefined;
+                    }
+                } else if (coordinatorCpId) {
+                    config.sections.push({ sectionName, coordinatorCpId });
+                }
+            }
+
+            await config.save();
+
+            res.json({ message: 'Configuration updated successfully', config });
 
         } catch (error: any) {
-            res.status(500).json({ error: 'Failed to assign coordinator' });
+            console.error('updateClassConfig error:', error);
+            res.status(500).json({ error: 'Failed to update class configuration' });
         }
     }
 
@@ -108,16 +132,36 @@ export class ClassController {
                 whatsappNumber: { $exists: true, $nin: [null, ''] }
             });
 
-            // Return simple student list
-            const formattedStudents = students.map(student => ({
-                id: student._id,
-                admissionNumber: student.admissionNumber,
-                name: `${student.firstName} ${student.lastName}`,
-                phone: student.phone,
-                whatsappNumber: student.whatsappNumber
-            }));
+            // 3. Sort students deterministically (e.g., by admissionNumber)
+            students.sort((a, b) => a.admissionNumber.localeCompare(b.admissionNumber));
 
-            res.json({ students: formattedStudents });
+            // 4. Partition based on ClassStrength
+            const config = await ClassConfig.findOne({ classId, group: group as 'PCM' | 'PCB' });
+            const strength = config?.classStrength || 40;
+            const configSections = config?.sections || [];
+
+            const partitionedSections: any[] = [];
+            
+            for (let i = 0; i < students.length; i += strength) {
+                const sectionName = String.fromCharCode(65 + Math.floor(i / strength)); // A, B, C...
+                const sectionStudents = students.slice(i, i + strength).map(student => ({
+                    id: student._id,
+                    admissionNumber: student.admissionNumber,
+                    name: `${student.firstName} ${student.lastName}`,
+                    phone: student.phone,
+                    whatsappNumber: student.whatsappNumber
+                }));
+
+                const coordinatorCpId = configSections.find(s => s.sectionName === sectionName)?.coordinatorCpId || null;
+
+                partitionedSections.push({
+                    sectionName,
+                    coordinatorCpId,
+                    students: sectionStudents
+                });
+            }
+
+            res.json({ sections: partitionedSections, classStrength: strength });
 
         } catch (error: any) {
             console.error('getClassStudents error:', error);

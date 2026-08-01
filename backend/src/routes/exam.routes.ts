@@ -19,7 +19,8 @@ router.post('/:id/sections/:subject/questions', requireRole(['TEACHER', 'ASSISTA
 router.patch('/:id/sections/:subject/questions/:qId', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.updateQuestion(req, res));
 router.delete('/:id/sections/:subject/questions/:qId', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.removeQuestion(req, res));
 
-// 4. Section Approval (Assigned Teacher only - verified in controller)
+// 4. Section Management (Assigned Teacher only - verified in controller)
+router.patch('/:id/sections/:subject', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.updateSectionMetadata(req, res));
 router.patch('/:id/sections/:subject/approve', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.approveSection(req, res));
 
 // 5. Exam Lifecycle (Admin or Coordinator)

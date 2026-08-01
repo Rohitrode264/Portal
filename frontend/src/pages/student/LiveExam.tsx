@@ -186,10 +186,10 @@ export function LiveExam() {
         <div className="w-full max-w-sm">
           {/* Brand header */}
           <div className="flex items-center justify-center gap-2.5 mb-8">
-            <img src="/images/logo_red.jpg" alt="Logo" className="w-7 h-7 rounded-lg object-contain shadow-xs" />
+            <img src="/images/merit_logo.png" alt="Merit Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs bg-white p-0.5" />
             <div className="text-left">
-              <p className="text-xs font-black text-gray-900 leading-none tracking-tight">New Career Point</p>
-              <p className="text-[9px] text-gray-500 font-bold leading-tight uppercase tracking-wider mt-0.5">Learning Portal · Exam Lobby</p>
+              <p className="text-xs font-black text-gray-900 leading-none tracking-tight">Merit</p>
+              <p className="text-[9px] text-gray-500 font-bold leading-tight uppercase tracking-wider mt-0.5">By New Career Point · Exam Lobby</p>
             </div>
           </div>
 
@@ -252,10 +252,10 @@ export function LiveExam() {
 
           {/* Brand header */}
           <div className="flex items-center justify-center gap-2.5 mb-8">
-            <img src="/images/logo_red.jpg" alt="Logo" className="w-7 h-7 rounded-lg object-contain shadow-xs" />
+            <img src="/images/merit_logo.png" alt="Merit Logo" className="w-8 h-8 rounded-lg object-contain shadow-xs bg-white p-0.5" />
             <div className="text-left">
-              <p className="text-xs font-black text-gray-900 leading-none tracking-tight">New Career Point</p>
-              <p className="text-[9px] text-gray-500 font-bold leading-tight uppercase tracking-wider mt-0.5">Learning Portal · Exam Lobby</p>
+              <p className="text-xs font-black text-gray-900 leading-none tracking-tight">Merit</p>
+              <p className="text-[9px] text-gray-500 font-bold leading-tight uppercase tracking-wider mt-0.5">By New Career Point · Exam Lobby</p>
             </div>
           </div>
 
@@ -530,6 +530,19 @@ export function LiveExam() {
                             </span>
                           </div>
                           
+                          {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
+                            <div className="mb-5 flex justify-center">
+                              <img src={q.diagramUrl} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white" />
+                            </div>
+                          )}
+                          {q.diagramUrls && q.diagramUrls.length > 0 && (
+                            <div className="mb-5 flex flex-wrap gap-4 justify-center">
+                              {q.diagramUrls.map((url: string) => (
+                                <img key={url} src={url} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white" />
+                              ))}
+                            </div>
+                          )}
+
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {q.options.map((opt: string, optIndex: number) => {
                               const letter = String.fromCharCode(65 + optIndex);

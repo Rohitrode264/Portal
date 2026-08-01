@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { Types } from 'mongoose';
+import { ExamService } from '../services/exam.service';
 import { Exam, SubjectType, SectionStatus } from '../models/Exam.model';
 import { ClassConfig } from '../models/ClassConfig.model';
 import { AcademicClass } from '../models/AcademicClass.model';
@@ -6,6 +8,7 @@ import { User } from '../models/User.model';
 import { ExamSession } from '../models/ExamSession.model';
 import { Student } from '../models/Student.model';
 import { Enrollment } from '../models/Enrollment.model';
+import { deleteFromS3 } from './upload.controller';
 
 export class ExamController {
     
@@ -129,14 +132,7 @@ export class ExamController {
             const exams = await Exam.find(query).sort({ createdAt: -1 });
             const resolvedExams = await Promise.all(exams.map(async (exam) => {
                 const examObj = exam.toObject();
-                const classConfig = await ClassConfig.findOne({ classId: exam.classId, group: exam.group });
-                if (classConfig && classConfig.examCoordinatorCpId) {
-                    (examObj as any).classDefaultCoordinatorCpId = classConfig.examCoordinatorCpId;
-                    if (!examObj.coordinatorCpId) {
-                        (examObj as any).coordinatorCpId = classConfig.examCoordinatorCpId;
-                        (examObj as any).isClassDefaultCoordinator = true;
-                    }
-                }
+                // Removed the default class coordinator injection since coordinators are now per-section
                 return examObj;
             }));
 
@@ -155,17 +151,50 @@ export class ExamController {
                 return;
             }
             const examObj = exam.toObject();
-            const classConfig = await ClassConfig.findOne({ classId: exam.classId, group: exam.group });
-            if (classConfig && classConfig.examCoordinatorCpId) {
-                (examObj as any).classDefaultCoordinatorCpId = classConfig.examCoordinatorCpId;
-                if (!examObj.coordinatorCpId) {
-                    (examObj as any).coordinatorCpId = classConfig.examCoordinatorCpId;
-                    (examObj as any).isClassDefaultCoordinator = true;
-                }
-            }
+            // Removed default class coordinator logic
             res.json({ exam: examObj });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to fetch exam' });
+        }
+    }
+
+    // 3b. Update Section Metadata
+    async updateSectionMetadata(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, subject } = req.params;
+            const { defaultMarks, defaultNegativeMarks } = req.body;
+
+            const exam = await Exam.findById(id);
+            if (!exam) {
+                res.status(404).json({ error: 'Exam not found' });
+                return;
+            }
+
+            if (exam.status !== 'DRAFT' && exam.status !== 'LOCKED') {
+                res.status(400).json({ error: 'Cannot update section metadata if exam is not DRAFT or LOCKED' });
+                return;
+            }
+
+            const section = exam.sections.find(s => s.subject === subject);
+            if (!section) {
+                res.status(404).json({ error: 'Section not found' });
+                return;
+            }
+
+            if (defaultMarks !== undefined) {
+                section.defaultMarks = defaultMarks;
+                section.questions.forEach(q => q.marks = defaultMarks);
+            }
+            if (defaultNegativeMarks !== undefined) {
+                section.defaultNegativeMarks = defaultNegativeMarks;
+                section.questions.forEach(q => q.negativeMarks = defaultNegativeMarks);
+            }
+
+            await exam.save();
+            res.json({ message: 'Section metadata updated', section });
+        } catch (error: any) {
+            console.error('Update Section Error:', error);
+            res.status(500).json({ error: 'Failed to update section' });
         }
     }
 
@@ -250,12 +279,24 @@ export class ExamController {
                 }
             }
 
+            // Find question to potentially delete its images
+            const questionToRemove = section.questions.find(q => q._id?.toString() === qId);
+
             section.questions = section.questions.filter(q => q._id?.toString() !== qId);
             if (section.questions.length === 0) {
                 section.status = 'PENDING';
             }
 
             await exam.save();
+
+            // Delete images from S3 asynchronously after DB save
+            if (questionToRemove) {
+                if (questionToRemove.diagramUrl) deleteFromS3(questionToRemove.diagramUrl);
+                if (questionToRemove.diagramUrls && questionToRemove.diagramUrls.length > 0) {
+                    questionToRemove.diagramUrls.forEach(url => deleteFromS3(url));
+                }
+            }
+
             res.json({ message: 'Question removed', section });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to remove question' });
@@ -302,8 +343,32 @@ export class ExamController {
             if (correctAnswer !== undefined) question.correctAnswer = correctAnswer;
             if (marks !== undefined) question.marks = marks;
             if (negativeMarks !== undefined) question.negativeMarks = negativeMarks;
+            
+            const oldDiagramUrl = question.diagramUrl;
+            const oldDiagramUrls = question.diagramUrls || [];
+
+            if (req.body.diagramUrl !== undefined) {
+                question.diagramUrl = req.body.diagramUrl;
+            }
+            if (req.body.diagramUrls !== undefined) {
+                question.diagramUrls = req.body.diagramUrls;
+            }
 
             await exam.save();
+
+            // Cleanup removed images from S3 asynchronously
+            if (req.body.diagramUrl !== undefined && oldDiagramUrl && req.body.diagramUrl !== oldDiagramUrl) {
+                deleteFromS3(oldDiagramUrl);
+            }
+            if (req.body.diagramUrls !== undefined) {
+                const newUrls = req.body.diagramUrls;
+                oldDiagramUrls.forEach(url => {
+                    if (!newUrls.includes(url)) {
+                        deleteFromS3(url);
+                    }
+                });
+            }
+
             res.json({ message: 'Question updated', section });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to update question' });
@@ -461,168 +526,15 @@ export class ExamController {
     // 6. Get Exam Results & Percentiles (Coordinators / Teachers / Admins)
     async getExamResults(req: Request, res: Response): Promise<void> {
         try {
-            const { id } = req.params;
-            const exam = await Exam.findById(id);
-            if (!exam) {
-                res.status(404).json({ error: 'Exam not found' });
-                return;
-            }
-
-            // Build Question map
-            const questionMap = new Map<string, {
-                subject: string;
-                correctAnswer: string;
-                marks: number;
-                negativeMarks: number;
-                text: string;
-            }>();
-            let maxMarks = 0;
-
-            for (const sec of exam.sections) {
-                for (const q of sec.questions) {
-                    if (q._id) {
-                        const m = q.marks || exam.defaultMarks || 4;
-                        const nm = q.negativeMarks || exam.defaultNegativeMarks || 1;
-                        questionMap.set(q._id.toString(), {
-                            subject: sec.subject,
-                            correctAnswer: q.correctAnswer,
-                            marks: m,
-                            negativeMarks: nm,
-                            text: q.text
-                        });
-                        maxMarks += m;
-                    }
-                }
-            }
-
-            // Fetch students enrolled in class & group
-            const enrollments = await Enrollment.find({ academicClassId: exam.classId, status: 'ONGOING' });
-            const studentIds = enrollments.map(e => e.studentId);
-            const students = await Student.find({
-                _id: { $in: studentIds },
-                status: 'ACTIVE',
-                cetBucket: exam.group
-            });
-
-            // Fetch exam sessions
-            const sessions = await ExamSession.find({ examId: id });
-
-            const groupSubjects = exam.group === 'PCB'
-                ? ['PHYSICS', 'CHEMISTRY', 'BIOLOGY']
-                : ['PHYSICS', 'CHEMISTRY', 'MATHS'];
-
-            // Evaluate scores for each student
-            const rawRoster = students.map(student => {
-                const session = sessions.find(s => s.studentCpId === student.admissionNumber);
-                const attended = session ? (session.status !== 'ABSENT') : false;
-                
-                let totalScore = 0;
-                let correctCount = 0;
-                let wrongCount = 0;
-                let unattemptedCount = 0;
-                const subjectScores: Record<string, { score: number; correct: number; wrong: number; unattempted: number }> = {};
-                groupSubjects.forEach(s => {
-                    subjectScores[s] = { score: 0, correct: 0, wrong: 0, unattempted: 0 };
-                });
-
-                if (attended && session) {
-                    const answerMap = new Map(session.answers.map(a => [a.questionId.toString(), a.selectedOption]));
-                    
-                    for (const [qId, q] of questionMap.entries()) {
-                        const subj = q.subject || 'PHYSICS';
-                        if (!subjectScores[subj]) {
-                            subjectScores[subj] = { score: 0, correct: 0, wrong: 0, unattempted: 0 };
-                        }
-
-                        const selected = answerMap.get(qId);
-                        if (!selected) {
-                            unattemptedCount++;
-                            subjectScores[subj].unattempted++;
-                        } else if (selected === q.correctAnswer) {
-                            correctCount++;
-                            totalScore += q.marks;
-                            subjectScores[subj].correct++;
-                            subjectScores[subj].score += q.marks;
-                        } else {
-                            wrongCount++;
-                            totalScore -= q.negativeMarks;
-                            subjectScores[subj].wrong++;
-                            subjectScores[subj].score -= q.negativeMarks;
-                        }
-                    }
-                }
-
-                return {
-                    studentCpId: student.admissionNumber,
-                    name: `${student.firstName} ${student.lastName}`,
-                    status: session ? session.status : 'ABSENT',
-                    attended,
-                    totalScore,
-                    maxMarks,
-                    correctCount,
-                    wrongCount,
-                    unattemptedCount,
-                    subjectScores,
-                    submittedAt: session?.submittedAt || null
-                };
-            });
-
-            // Calculate Ranks and Percentiles among attended students
-            const attendedList = rawRoster.filter(r => r.attended).sort((a, b) => b.totalScore - a.totalScore);
-            const totalAttended = attendedList.length;
-
-            const scoreToRankAndPercentile = new Map<number, { rank: number; percentile: number }>();
-            for (let i = 0; i < attendedList.length; i++) {
-                const item = attendedList[i];
-                if (!scoreToRankAndPercentile.has(item.totalScore)) {
-                    const countBelow = attendedList.filter(x => x.totalScore < item.totalScore).length;
-                    const percentile = totalAttended > 0 ? Number(((countBelow / totalAttended) * 100).toFixed(2)) : 0;
-                    scoreToRankAndPercentile.set(item.totalScore, {
-                        rank: i + 1,
-                        percentile
-                    });
-                }
-            }
-
-            const roster = rawRoster.map(item => {
-                if (!item.attended) {
-                    return { ...item, rank: null, percentile: null };
-                }
-                const rp = scoreToRankAndPercentile.get(item.totalScore) || { rank: totalAttended, percentile: 0 };
-                return {
-                    ...item,
-                    rank: rp.rank,
-                    percentile: rp.percentile
-                };
-            });
-
-            // Summary stats
-            const highestScore = totalAttended > 0 ? attendedList[0].totalScore : 0;
-            const avgScore = totalAttended > 0 
-                ? Number((attendedList.reduce((acc, curr) => acc + curr.totalScore, 0) / totalAttended).toFixed(1))
-                : 0;
-
-            res.json({
-                exam: {
-                    _id: exam._id,
-                    title: exam.title,
-                    className: exam.className,
-                    group: exam.group,
-                    status: exam.status,
-                    isResultPublished: exam.isResultPublished || false,
-                    maxMarks
-                },
-                summary: {
-                    totalStudents: rawRoster.length,
-                    totalAttended,
-                    averageScore: avgScore,
-                    highestScore
-                },
-                roster
-            });
+            const id = req.params.id as string;
+            const result = await ExamService.calculateExamResult(id);
+            res.json(result);
         } catch (error: any) {
-            console.error('Get Exam Results Error:', error);
-            res.status(500).json({ error: 'Failed to fetch exam results' });
+            if (error.message === 'Exam not found') {
+                res.status(404).json({ error: 'Exam not found' });
+            } else {
+                res.status(500).json({ error: 'Failed to evaluate results' });
+            }
         }
     }
 

@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import {
-  Loader2, Plus, Calendar, Lock, FileEdit,
-  CheckCircle2, Radio, ChevronRight, BookOpen, Users, Trophy
-} from 'lucide-react';
+import { Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { Icon } from '../../components/ui/Icon';
+import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { EmptyExamsIllustration } from '../../components/ui/Illustrations';
 
 type Exam = {
   _id: string;
@@ -21,30 +22,78 @@ type Exam = {
   sections?: { subject: string; questions: any[] }[];
 };
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  DRAFT:     { label: 'Draft',     color: 'text-gray-500',   dot: 'bg-gray-400' },
-  LOCKED:    { label: 'Locked',    color: 'text-amber-600',  dot: 'bg-amber-400' },
-  PUBLISHED: { label: 'Scheduled', color: 'text-blue-600',   dot: 'bg-blue-400' },
-  LIVE:      { label: 'Live',      color: 'text-green-600',  dot: 'bg-green-500' },
-  COMPLETED: { label: 'Done',      color: 'text-gray-400',   dot: 'bg-gray-300' },
-  ARCHIVED:  { label: 'Archived',  color: 'text-gray-300',   dot: 'bg-gray-200' },
+type PortalSection = {
+  sectionName: string;
+  coordinatorCpId: string | null;
+  students: any[];
 };
 
-const EXAM_ICON: Record<string, ReactNode> = {
-  LIVE:      <Radio size={16} className="text-green-500" />,
-  COMPLETED: <CheckCircle2 size={16} className="text-gray-400" />,
-  LOCKED:    <Lock size={16} className="text-amber-500" />,
-  PUBLISHED: <Calendar size={16} className="text-blue-500" />,
-  DRAFT:     <FileEdit size={16} className="text-gray-400" />,
-  ARCHIVED:  <FileEdit size={16} className="text-gray-300" />,
+const STATUS_CONFIG: Record<string, {
+  label: string;
+  badge: 'default' | 'amber' | 'blue' | 'green' | 'purple';
+  icon: string;
+  iconColor: string;
+  bg: string;
+}> = {
+  DRAFT:     { label: 'Draft',     badge: 'default', icon: 'draft',       iconColor: 'var(--text-muted)',  bg: 'var(--surface-sub)' },
+  LOCKED:    { label: 'Locked',    badge: 'amber',   icon: 'lock',        iconColor: 'var(--warning)',     bg: 'var(--warning-light)' },
+  PUBLISHED: { label: 'Scheduled', badge: 'blue',    icon: 'event',       iconColor: 'var(--accent)',      bg: 'var(--accent-light)' },
+  LIVE:      { label: 'Live',      badge: 'green',   icon: 'sensors',     iconColor: 'var(--success)',     bg: 'var(--success-light)' },
+  COMPLETED: { label: 'Done',      badge: 'purple',  icon: 'task_alt',    iconColor: 'var(--accent)',      bg: 'var(--accent-light)' }, // Use accent for purple fallback
+  ARCHIVED:  { label: 'Archived',  badge: 'default', icon: 'archive',     iconColor: 'var(--text-muted)',  bg: 'var(--surface-sub)' },
 };
+
+function EmptyExams({ canCreate, onCreateClick }: { canCreate: boolean; onCreateClick: () => void }) {
+  return (
+    <div className="card py-14 text-center" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
+      <EmptyExamsIllustration className="w-28 h-28 mx-auto mb-4" />
+      <p style={{ color: 'var(--text-sub)' }} className="text-[15px] font-semibold">No exams yet</p>
+      <p style={{ color: 'var(--text-muted)' }} className="text-[13px] mt-1">
+        {canCreate ? 'Create the first question paper for this group.' : 'No exams have been scheduled yet.'}
+      </p>
+      {canCreate && (
+        <div className="mt-5">
+          <Button size="sm" variant="primary" onClick={onCreateClick}>
+            <Icon name="add" size={16} />
+            Create Exam
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SubjectDots({ sections }: { sections?: { subject: string; questions: any[] }[] }) {
+  if (!sections?.length) return null;
+  const colors: Record<string, string> = {
+    PHYSICS:   'bg-blue-400',
+    CHEMISTRY: 'bg-emerald-400',
+    MATHS:     'bg-purple-400',
+    BIOLOGY:   'bg-teal-400',
+  };
+  return (
+    <div className="flex items-center gap-1">
+      {sections.map(s => (
+        <span
+          key={s.subject}
+          title={s.subject}
+          className={`w-2 h-2 rounded-full ${colors[s.subject] || 'bg-zinc-300'}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 export function ExamsPage() {
   const { classId, group } = useParams<{ classId: string; group: string }>();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'exams' | 'students'>('exams');
-  const [students, setStudents] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'exams' | 'sections'>('sections');
+  const [sections, setSections] = useState<PortalSection[]>([]);
+  const [classStrength, setClassStrength] = useState<number>(40);
+  const [isEditingStrength, setIsEditingStrength] = useState(false);
+  const [tempStrength, setTempStrength] = useState<number>(40);
+  const [staff, setStaff] = useState<any[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +101,8 @@ export function ExamsPage() {
   useEffect(() => {
     if (user?.role === 'STUDENT') { navigate('/dashboard', { replace: true }); return; }
     fetchExams();
-    if (activeTab === 'students' && classId && group) fetchStudents();
+    fetchStaff();
+    if (activeTab === 'sections' && classId && group) fetchSections();
   }, [classId, group, activeTab, user]);
 
   const fetchExams = async () => {
@@ -67,16 +117,37 @@ export function ExamsPage() {
     }
   };
 
-  const fetchStudents = async () => {
+  const fetchStaff = async () => {
+    try {
+      const res = await api.get('/teachers/staff');
+      setStaff(res.data.staff || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchSections = async () => {
     if (!classId || !group) return;
     setStudentsLoading(true);
     try {
       const res = await api.get(`/classes/${classId}/students?group=${group}`);
-      setStudents(res.data.students || []);
+      setSections(res.data.sections || []);
+      setClassStrength(res.data.classStrength || 40);
+      setTempStrength(res.data.classStrength || 40);
     } catch {
-      toast.error('Failed to load student roster');
+      toast.error('Failed to load sections roster');
     } finally {
       setStudentsLoading(false);
+    }
+  };
+
+  const updateClassConfig = async (strength?: number, sectionName?: string, coordinatorCpId?: string | null) => {
+    try {
+      await api.patch(`/classes/${classId}/config`, { group, classStrength: strength, sectionName, coordinatorCpId });
+      toast.success('Configuration updated');
+      fetchSections();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to update config');
     }
   };
 
@@ -87,166 +158,254 @@ export function ExamsPage() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-5 animate-fade-in">
 
-        {/* Page Header */}
-        <div className="flex items-center justify-between">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">
-              {group ? `${group} Group` : 'Exams'}
-            </h1>
-            <p className="text-sm text-gray-400 mt-0.5">
-              {classId ? 'Schedule, students, and active tests.' : 'All question papers and schedules.'}
+            <h1 className="text-page-title">{group ? `${group} Group` : 'Exams'}</h1>
+            <p className="text-secondary mt-1">
+              {classId ? 'Manage sections, students, and exam schedules.' : 'All exams and question papers.'}
             </p>
           </div>
           {canCreate && activeTab === 'exams' && (
-            <button
-              onClick={() => navigate('/exams/create')}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-3.5 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors"
-            >
-              <Plus size={15} />
-              New exam
-            </button>
+            <Button variant="primary" size="md" onClick={() => navigate('/exams/create')}>
+              <Icon name="add" size={16} />
+              New Exam
+            </Button>
           )}
         </div>
 
         {/* Tabs */}
         {classId && group && (
-          <div className="flex border-b border-gray-100 -mb-2">
-            {(['exams', 'students'] as const).map(tab => (
+          <div className="flex border-b" style={{ borderColor: 'var(--border)' }}>
+            {(['sections', 'exams'] as const).map(tab => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`pb-3 px-4 text-sm font-medium transition-colors relative capitalize ${
-                  activeTab === tab ? 'text-gray-900' : 'text-gray-400 hover:text-gray-600'
-                }`}
+                style={{ color: activeTab === tab ? 'var(--text)' : 'var(--text-muted)' }}
+                className="px-4 pb-3 pt-0.5 text-[13px] font-medium transition-colors relative capitalize hover:opacity-80"
               >
                 {tab}
-                {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full" />}
+                {activeTab === tab && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--text)' }} />
+                )}
               </button>
             ))}
           </div>
         )}
 
-        {/* Content */}
-        {activeTab === 'students' ? (
+        {/* Sections Tab */}
+        {activeTab === 'sections' ? (
           studentsLoading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="animate-spin text-gray-300" size={24} />
-            </div>
-          ) : students.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl p-12 flex flex-col items-center text-center gap-2">
-              <Users size={28} className="text-gray-200 mb-1" />
-              <p className="text-sm font-medium text-gray-600">No students found</p>
-              <p className="text-xs text-gray-400">No verified CET students registered in this group.</p>
+            <LoadingSpinner fullPage />
+          ) : sections.length === 0 ? (
+            <div className="card py-16 text-center" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
+              <Icon name="group" size={36} style={{ color: 'var(--text-muted)', opacity: 0.4, margin: '0 auto 12px' }} />
+              <p style={{ color: 'var(--text-sub)' }} className="text-[14px] font-semibold">No students found</p>
+              <p style={{ color: 'var(--text-muted)' }} className="text-[12px] mt-1">No verified CET students registered in this group.</p>
             </div>
           ) : (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-50 flex justify-between items-center">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Enrolled · {students.length}</p>
+            <div className="space-y-5">
+              {/* Class Config Card */}
+              <div className="card p-4 flex items-center justify-between" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
+                <div>
+                  <p style={{ color: 'var(--text)' }} className="text-[14px] font-semibold">Class Capacity</p>
+                  <p style={{ color: 'var(--text-muted)' }} className="text-[13px] mt-0.5">
+                    Physical seating capacity for automatic student partitioning.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 ml-4 shrink-0">
+                  {isEditingStrength ? (
+                    <>
+                      <input
+                        type="number"
+                        value={tempStrength}
+                        onChange={e => setTempStrength(parseInt(e.target.value) || 0)}
+                        className="form-input w-20 text-center"
+                        min={1}
+                      />
+                      <Button size="sm" variant="primary" onClick={() => { setIsEditingStrength(false); updateClassConfig(tempStrength); }}>
+                        Save
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setIsEditingStrength(false)}>Cancel</Button>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ background: 'var(--surface-sub)', color: 'var(--text)' }}
+                        className="font-mono text-[13px] px-2.5 py-1 rounded-lg font-semibold">
+                        {classStrength} seats
+                      </span>
+                      {canCreate && (
+                        <button
+                          onClick={() => setIsEditingStrength(true)}
+                          style={{ color: 'var(--text-muted)' }}
+                          className="p-1.5 rounded-lg hover:bg-zinc-100 transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="divide-y divide-gray-50">
-                {students.map((student) => (
-                  <div key={student.id} className="px-4 py-3 flex items-center justify-between hover:bg-gray-50/50 transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-500 shrink-0">
-                        {student.name?.charAt(0) || '?'}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">{student.name}</p>
-                        <p className="text-xs text-gray-400 font-mono">{student.admissionNumber}</p>
-                      </div>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs text-gray-400 font-mono">{student.whatsappNumber}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        ) : (
-          loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="animate-spin text-gray-300" size={24} />
-            </div>
-          ) : exams.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-xl p-12 flex flex-col items-center text-center gap-2">
-              <BookOpen size={28} className="text-gray-200 mb-1" />
-              <p className="text-sm font-medium text-gray-600">No exams yet</p>
-              <p className="text-xs text-gray-400">Create the first question paper for this group.</p>
-              {canCreate && (
-                <button
-                  onClick={() => navigate('/exams/create')}
-                  className="mt-3 flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors"
-                >
-                  <Plus size={15} /> Create exam
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="bg-white border border-gray-100 rounded-xl overflow-hidden">
-              <div className="divide-y divide-gray-50">
-                {exams.map((exam) => {
-                  const st = STATUS_CONFIG[exam.status] || STATUS_CONFIG.DRAFT;
-                  const totalQ = exam.sections?.reduce((sum, s) => sum + s.questions.length, 0) ?? 0;
+
+              {/* Section Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {sections.map(section => {
+                  const coordinatorName = section.coordinatorCpId
+                    ? staff.find(s => s.cpId === section.coordinatorCpId)?.name || section.coordinatorCpId
+                    : null;
+
                   return (
                     <div
-                      key={exam._id}
-                      onClick={() => navigate(`/exams/${exam._id}`)}
-                      className="px-4 py-3.5 flex items-center gap-3.5 hover:bg-gray-50/60 transition-colors cursor-pointer group"
+                      key={section.sectionName}
+                      onClick={() => navigate(`/classes/${classId}/group/${group}/section/${section.sectionName}`)}
+                      className="card cursor-pointer transition-all group card-hover overflow-hidden"
+                      style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}
                     >
-                      {/* Status Icon */}
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        exam.status === 'LIVE' ? 'bg-green-50' :
-                        exam.status === 'PUBLISHED' ? 'bg-blue-50' :
-                        exam.status === 'COMPLETED' ? 'bg-gray-50' :
-                        'bg-gray-50'
-                      }`}>
-                        {EXAM_ICON[exam.status] || EXAM_ICON.DRAFT}
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">{exam.title}</p>
-                          {exam.status === 'LIVE' && (
-                            <span className="flex items-center gap-1 text-[10px] font-semibold text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
-                              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" /> Live
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5 flex-wrap">
-                          <span>{exam.className}</span>
-                          <span>·</span>
-                          <span className="font-medium text-gray-500">{exam.group}</span>
-                          <span>·</span>
-                          <span>{exam.duration} min</span>
-                          {totalQ > 0 && <><span>·</span><span>{totalQ} questions</span></>}
-                          {exam.scheduledAt && <><span>·</span><span>{formatDate(exam.scheduledAt)}</span></>}
-                        </p>
-                      </div>
-
-                      {/* Status badge + Arrow */}
-                      <div className="flex items-center gap-3 shrink-0">
-                        {exam.status === 'COMPLETED' ? (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`/exams/${exam._id}/results`);
-                            }}
-                            className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-emerald-100 transition-colors"
+                      {/* Section Header */}
+                      <div
+                        className="px-4 py-3 border-b flex items-center justify-between transition-colors"
+                        style={{ background: 'var(--surface-sub)', borderColor: 'var(--border)' }}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-sm"
+                            style={{ background: 'var(--accent-light)', color: 'var(--accent)' }}
                           >
-                            <Trophy size={13} /> Results
-                          </button>
+                            {section.sectionName}
+                          </div>
+                          <div>
+                            <p style={{ color: 'var(--text)' }} className="text-[14px] font-semibold">Section {section.sectionName}</p>
+                            <p style={{ color: 'var(--text-muted)' }} className="text-[12px]">{section.students.length} students</p>
+                          </div>
+                        </div>
+                        <Icon name="chevron_right" size={16} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+
+                      <div className="p-4">
+                        <p style={{ color: 'var(--text-muted)' }} className="text-[11px] font-semibold uppercase tracking-wider mb-2">
+                          Invigilator / Coordinator
+                        </p>
+                        {canCreate ? (
+                          <select
+                            value={section.coordinatorCpId || ''}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => updateClassConfig(undefined, section.sectionName, e.target.value || null)}
+                            className="form-select"
+                          >
+                            <option value="">— Unassigned —</option>
+                            {staff.map(s => (
+                              <option key={s.cpId} value={s.cpId}>{s.name} ({s.cpId})</option>
+                            ))}
+                          </select>
                         ) : (
-                          <span className={`text-xs font-medium ${st.color} hidden sm:block`}>{st.label}</span>
+                          <div className="flex items-center gap-2 text-[14px] font-medium" style={{ color: 'var(--text)' }}>
+                            <Icon
+                              name="verified_user"
+                              size={15}
+                              style={{ color: coordinatorName ? 'var(--success)' : 'var(--text-muted)' }}
+                            />
+                            {coordinatorName || 'Not Assigned'}
+                          </div>
                         )}
-                        <ChevronRight size={15} className="text-gray-300 group-hover:text-gray-500 transition-colors" />
                       </div>
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )
+        ) : (
+          /* ── Exams Tab ── */
+          loading ? (
+            <LoadingSpinner fullPage />
+          ) : exams.length === 0 ? (
+            <EmptyExams canCreate={canCreate} onCreateClick={() => navigate('/exams/create')} />
+          ) : (
+            <div className="card overflow-hidden stagger" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
+              {/* Fix: Added horizontal scroll wrapper */}
+              <div className="overflow-x-auto">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Exam</th>
+                      <th>Class · Group</th>
+                      <th>Subjects</th>
+                      <th>Scheduled</th>
+                      <th>Duration</th>
+                      <th>Status</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {exams.map(exam => {
+                      const st = STATUS_CONFIG[exam.status] || STATUS_CONFIG.DRAFT;
+                      const totalQ = exam.sections?.reduce((sum, s) => sum + s.questions.length, 0) ?? 0;
+                      return (
+                        <tr
+                          key={exam._id}
+                          onClick={() => navigate(`/exams/${exam._id}`)}
+                          className="cursor-pointer"
+                        >
+                          <td>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: st.bg }}>
+                                <Icon name={st.icon} size={16} style={{ color: st.iconColor }} />
+                              </div>
+                              <div>
+                                <p style={{ color: 'var(--text)' }} className="font-semibold text-[13px]">{exam.title}</p>
+                                {totalQ > 0 && (
+                                  <p style={{ color: 'var(--text-muted)' }} className="text-[11px]">{totalQ} questions</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td>
+                            <span style={{ color: 'var(--text-sub)' }}>{exam.className}</span>
+                            {exam.group && <Badge variant="indigo" size="sm" className="ml-2">{exam.group}</Badge>}
+                          </td>
+                          <td>
+                            <SubjectDots sections={exam.sections} />
+                          </td>
+                          <td className="font-mono text-[12px]">
+                            {exam.scheduledAt ? (
+                              <span style={{ color: 'var(--text)' }}>{formatDate(exam.scheduledAt)}</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)', opacity: 0.5 }}>—</span>
+                            )}
+                          </td>
+                          <td style={{ color: 'var(--text-sub)' }}>{exam.duration} min</td>
+                          <td>
+                            {exam.status === 'LIVE' ? (
+                              <span
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-full"
+                                style={{ background: 'var(--danger-light)', color: 'var(--danger)' }}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                Live
+                              </span>
+                            ) : (
+                              <Badge variant={st.badge} size="sm">{st.label}</Badge>
+                            )}
+                          </td>
+                          <td>
+                            <div className="flex items-center gap-1.5">
+                              {exam.status === 'COMPLETED' && (
+                                <Button variant="outline" size="sm" onClick={e => { e.stopPropagation(); navigate(`/exams/${exam._id}/results`); }}>
+                                  <Icon name="leaderboard" size={14} />
+                                  Results
+                                </Button>
+                              )}
+                              <Icon name="chevron_right" size={16} style={{ color: 'var(--text-muted)' }} />
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )
