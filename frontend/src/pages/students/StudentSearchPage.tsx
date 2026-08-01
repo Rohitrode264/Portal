@@ -4,7 +4,6 @@ import { api } from '../../lib/api';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { Icon } from '../../components/ui/Icon';
 import { Badge } from '../../components/ui/Badge';
-import { Button } from '../../components/ui/Button';
 
 interface StudentSearchResult {
   id: string;

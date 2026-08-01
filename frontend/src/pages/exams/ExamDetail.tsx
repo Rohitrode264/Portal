@@ -607,7 +607,7 @@ export function ExamDetail() {
 
   const handleUpdateSectionMeta = async (subject: string, updates: { defaultMarks?: number; defaultNegativeMarks?: number }) => {
     try {
-      const res = await api.patch(`/exams/${id}/sections/${subject}`, updates);
+      await api.patch(`/exams/${id}/sections/${subject}`, updates);
       setExam(prev => {
         if (!prev) return prev;
         const newSections = [...prev.sections];

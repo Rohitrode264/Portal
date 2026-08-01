@@ -3,7 +3,6 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
-import { Badge } from '../../components/ui/Badge';
 import { Icon } from '../../components/ui/Icon';
 import toast from 'react-hot-toast';
 
@@ -44,7 +43,6 @@ const GROUP_META = {
 function GroupCard({ group, cfg, onClick }: GroupCardProps) {
   const meta = GROUP_META[group];
   const totalSections = cfg.sections.length;
-  const coordinated = cfg.sections.filter(s => s.coordinatorCpId).length;
 
   return (
     <button
@@ -149,9 +147,6 @@ export function ClassesPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 stagger">
             {classes.map(cls => {
-              const totalSections = cls.pcm.sections.length + cls.pcb.sections.length;
-              const totalStudents = cls.pcm.classStrength + cls.pcb.classStrength;
-
               return (
                 <div
                   key={cls.id}
