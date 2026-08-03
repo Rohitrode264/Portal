@@ -131,8 +131,9 @@ export class ExamController {
 
             const exams = await Exam.find(query).sort({ createdAt: -1 });
             const resolvedExams = await Promise.all(exams.map(async (exam) => {
-                const examObj = exam.toObject();
-                // Removed the default class coordinator injection since coordinators are now per-section
+                const examObj = exam.toObject() as any;
+                const creator = await User.findOne({ cpId: exam.createdBy }).select('name');
+                examObj.createdByFields = creator ? { name: creator.name, cpId: exam.createdBy } : { name: exam.createdBy, cpId: exam.createdBy };
                 return examObj;
             }));
 
@@ -150,8 +151,9 @@ export class ExamController {
                 res.status(404).json({ error: 'Exam not found' });
                 return;
             }
-            const examObj = exam.toObject();
-            // Removed default class coordinator logic
+            const creator = await User.findOne({ cpId: exam.createdBy }).select('name');
+            const examObj = exam.toObject() as any;
+            examObj.createdByFields = creator ? { name: creator.name, cpId: exam.createdBy } : { name: exam.createdBy, cpId: exam.createdBy };
             res.json({ exam: examObj });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to fetch exam' });

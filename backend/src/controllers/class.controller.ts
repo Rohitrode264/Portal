@@ -161,7 +161,21 @@ export class ClassController {
                 });
             }
 
-            res.json({ sections: partitionedSections, classStrength: strength });
+            const academicClass = await AcademicClass.findById(classId).populate('templateId');
+            let className = 'Unknown Class';
+            let academicYear = '';
+            if (academicClass) {
+                const template = academicClass.templateId;
+                className = template ? `${template.grade}${template.stream ? ` (${template.stream})` : ''} — ${template.board}` : 'Unknown Class';
+                academicYear = academicClass.academicYear || '';
+            }
+
+            res.json({ 
+                sections: partitionedSections, 
+                classStrength: strength,
+                className,
+                academicYear
+            });
 
         } catch (error: any) {
             console.error('getClassStudents error:', error);

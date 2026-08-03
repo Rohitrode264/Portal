@@ -46,6 +46,7 @@ type Exam = {
   coordinatorCpId?: string;
   isClassDefaultCoordinator?: boolean;
   sections: Section[];
+  createdByFields?: { name: string; cpId: string };
 };
 
 type QForm = {
@@ -654,7 +655,7 @@ export function ExamDetail() {
               <h1 className="text-lg font-bold text-gray-900 truncate">{exam.title}</h1>
               <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${chip.cls}`}>{chip.label}</span>
             </div>
-            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
               <span className="text-xs text-gray-500">{exam.className}</span>
               <span className="text-gray-200">·</span>
               <span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded-md">{exam.group}</span>
@@ -666,6 +667,14 @@ export function ExamDetail() {
                   <span className="flex items-center gap-1 text-xs text-gray-400">
                     <Calendar size={11} />
                     {new Date(exam.scheduledAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </>
+              )}
+              {user?.role !== 'STUDENT' && exam.createdByFields && (
+                <>
+                  <span className="text-gray-200">·</span>
+                  <span className="text-xs text-gray-500 font-medium" title={`CP ID: ${exam.createdByFields.cpId}`}>
+                    Created by: {exam.createdByFields.name}
                   </span>
                 </>
               )}

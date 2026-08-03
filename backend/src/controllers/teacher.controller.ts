@@ -105,6 +105,7 @@ export class TeacherController {
             delete updates.password;
             delete updates.role;
             delete updates.cpId;
+            delete updates.isActive;
 
             const teacher = await User.findOneAndUpdate(
                 { cpId, role: 'TEACHER' },

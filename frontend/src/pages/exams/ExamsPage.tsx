@@ -3,7 +3,7 @@ import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Pencil } from 'lucide-react';
+import { Pencil, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
@@ -20,6 +20,7 @@ type Exam = {
   duration: number;
   scheduledAt?: string;
   sections?: { subject: string; questions: any[] }[];
+  createdByFields?: { name: string; cpId: string };
 };
 
 type PortalSection = {
@@ -95,6 +96,8 @@ export function ExamsPage() {
   const [tempStrength, setTempStrength] = useState<number>(40);
   const [staff, setStaff] = useState<any[]>([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [className, setClassName] = useState<string>('');
+  const [academicYear, setAcademicYear] = useState<string>('');
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -102,8 +105,8 @@ export function ExamsPage() {
     if (user?.role === 'STUDENT') { navigate('/dashboard', { replace: true }); return; }
     fetchExams();
     fetchStaff();
-    if (activeTab === 'sections' && classId && group) fetchSections();
-  }, [classId, group, activeTab, user]);
+    if (classId && group) fetchSections();
+  }, [classId, group, user]);
 
   const fetchExams = async () => {
     try {
@@ -134,6 +137,8 @@ export function ExamsPage() {
       setSections(res.data.sections || []);
       setClassStrength(res.data.classStrength || 40);
       setTempStrength(res.data.classStrength || 40);
+      setClassName(res.data.className || '');
+      setAcademicYear(res.data.academicYear || '');
     } catch {
       toast.error('Failed to load sections roster');
     } finally {
@@ -161,12 +166,25 @@ export function ExamsPage() {
       <div className="space-y-5 animate-fade-in">
 
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-page-title">{group ? `${group} Group` : 'Exams'}</h1>
-            <p className="text-secondary mt-1">
-              {classId ? 'Manage sections, students, and exam schedules.' : 'All exams and question papers.'}
-            </p>
+        <div className="flex items-center gap-3 justify-between flex-wrap">
+          <div className="flex items-center gap-3">
+            {classId && (
+              <button
+                onClick={() => navigate('/classes')}
+                className="w-9 h-9 rounded-xl bg-white border border-gray-100 flex items-center justify-center text-gray-400 hover:text-black hover:border-gray-200 transition-all shrink-0"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <div>
+              <h1 className="text-page-title">
+                {className ? `${className} (${group})` : (group ? `${group} Group` : 'Exams')}
+              </h1>
+              <p className="text-secondary mt-1">
+                {academicYear ? `Session: ${academicYear} · ` : ''}
+                {classId ? 'Manage sections, students, and exam schedules.' : 'All exams and question papers.'}
+              </p>
+            </div>
           </div>
           {canCreate && activeTab === 'exams' && (
             <Button variant="primary" size="md" onClick={() => navigate('/exams/create')}>
@@ -356,9 +374,15 @@ export function ExamsPage() {
                               </div>
                               <div>
                                 <p style={{ color: 'var(--text)' }} className="font-semibold text-[13px]">{exam.title}</p>
-                                {totalQ > 0 && (
-                                  <p style={{ color: 'var(--text-muted)' }} className="text-[11px]">{totalQ} questions</p>
-                                )}
+                                <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-secondary mt-0.5 opacity-85">
+                                  {totalQ > 0 && <span>{totalQ} questions</span>}
+                                  {totalQ > 0 && exam.createdByFields && <span>·</span>}
+                                  {exam.createdByFields && (
+                                    <span title={`CP ID: ${exam.createdByFields.cpId}`} className="font-normal text-gray-500">
+                                      Created by: {exam.createdByFields.name}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>

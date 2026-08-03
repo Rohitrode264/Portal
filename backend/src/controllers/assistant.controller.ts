@@ -103,6 +103,7 @@ export class AssistantController {
             delete updates.password;
             delete updates.role;
             delete updates.cpId;
+            delete updates.isActive;
 
             const assistant = await User.findOneAndUpdate(
                 { cpId, role: 'ASSISTANT' },
