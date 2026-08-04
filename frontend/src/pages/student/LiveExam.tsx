@@ -37,11 +37,13 @@ export function LiveExam() {
   }, [exam, sessionData, id]);
 
   // Tab Switch & Overlay Tracker
-  const handleVisibilityChange = useCallback(async () => {
-    if (document.hidden) {
+  const handleVisibilityChange = useCallback(async (reason?: string) => {
+    if (document.hidden || reason) {
       setIsBlurred(true);
       try {
-        const res = await api.post(`/live-exams/${id}/tab-switch`);
+        const res = await api.post(`/live-exams/${id}/tab-switch`, { 
+          reason: reason || (document.hidden ? 'Tab Switch / Background App' : 'Screen Focus Lost') 
+        });
         if (res.data.autoSubmitted) {
           toast.error(res.data.message, { duration: 10000 });
           navigate('/dashboard', { replace: true });
@@ -59,17 +61,23 @@ export function LiveExam() {
 
   useEffect(() => {
     if (!exam || !sessionData) return;
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    const onVisibilityChange = () => handleVisibilityChange();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    
     const handleBlur = () => {
       setIsBlurred(true);
-      handleVisibilityChange();
+      handleVisibilityChange('Screen Focus Lost / Blur');
     };
     const handleFocus = () => {
       setTimeout(() => { if (!document.hidden) setIsBlurred(false); }, 400);
     };
     const handleResize = () => {
       if (window.innerHeight < initialHeight.current * 0.85 || window.innerWidth < initialWidth.current * 0.85) {
-        setIsSplitScreen(true);
+        if (!isSplitScreen) {
+          setIsSplitScreen(true);
+          handleVisibilityChange('Split-screen / Window Resize Detected');
+        }
       } else {
         setIsSplitScreen(false);
       }
@@ -80,12 +88,12 @@ export function LiveExam() {
     window.addEventListener('resize', handleResize);
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('blur', handleBlur);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('resize', handleResize);
     };
-  }, [exam, sessionData, handleVisibilityChange]);
+  }, [exam, sessionData, handleVisibilityChange, isSplitScreen]);
 
 
   useEffect(() => {
@@ -361,22 +369,26 @@ export function LiveExam() {
       onContextMenu={e => e.preventDefault()}
       onDragStart={e => e.preventDefault()}
     >
-      {/* ── Security Overlay Blackout (Circle to Search / Gemini / Blur) ── */}
+      {/* ── Security Overlay Redesign (Google Standard) ── */}
       {(isBlurred || isSplitScreen) && (
-        <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-3xl flex flex-col items-center justify-center p-8 text-center text-white select-none">
-          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mb-6 border border-red-500/30 animate-pulse">
-            <AlertTriangle className="text-red-500" size={40} />
-          </div>
-          <h2 className="text-3xl font-black tracking-tight mb-3 text-red-400 uppercase">
-            {isSplitScreen ? 'Split-Screen / Pop-up Detected!' : 'Screen Focus Lost / AI Overlay'}
-          </h2>
-          <p className="text-sm text-slate-300 max-w-md leading-relaxed font-semibold mb-6">
-            {isSplitScreen 
-              ? 'Opening split-screen apps, resizing the window, or floating AI assistants (Gemini/WhatsApp) is strictly prohibited. Restore full-screen mode instantly.'
-              : 'Holding the navigation bar (Circle to Search), taking screenshots, or switching tabs causes an instant security blackout. Your violation has been logged.'}
-          </p>
-          <div className="bg-red-950/80 border border-red-800/50 px-6 py-3 rounded-2xl text-xs font-black text-red-300 uppercase tracking-widest">
-            Violation Strike: {warningCount} / 3 (Auto-submit on 3rd)
+        <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none">
+          <div className="bg-white border border-gray-200 shadow-2xl rounded-3xl p-8 max-w-lg w-full flex flex-col items-center">
+            <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6 border border-red-100 animate-pulse shadow-inner">
+              <AlertTriangle className="text-red-500" size={40} />
+            </div>
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight mb-3 text-gray-900 uppercase">
+              {isSplitScreen ? 'Split-Screen Detected' : 'Screen Focus Lost'}
+            </h2>
+            <p className="text-sm text-gray-500 max-w-md leading-relaxed font-semibold mb-8">
+              {isSplitScreen 
+                ? 'Opening split-screen apps, resizing the window, or floating AI assistants (Gemini/WhatsApp) is strictly prohibited. Restore full-screen mode instantly.'
+                : 'Holding the navigation bar (Circle to Search), taking screenshots, or switching tabs causes an instant security violation. Your action has been logged.'}
+            </p>
+            <div className="bg-red-50 border border-red-200 px-6 py-4 rounded-2xl w-full text-center">
+              <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Violation Strike</p>
+              <p className="text-2xl font-black text-red-600 font-mono">{warningCount} / 3</p>
+              <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider mt-1">Auto-submit on 3rd violation</p>
+            </div>
           </div>
         </div>
       )}
@@ -521,7 +533,7 @@ export function LiveExam() {
                       return (
                         <div key={q._id} className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/80 shadow-2xs hover:border-gray-300/80 transition-all">
                           <div className="flex justify-between items-start gap-4 mb-5">
-                            <p className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed">
+                            <p className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
                               <span className="font-black text-blue-600 mr-2 font-mono">Q{i + 1}.</span> 
                               {q.text}
                             </p>
@@ -563,7 +575,7 @@ export function LiveExam() {
                                   }`}>
                                     {letter}
                                   </span>
-                                  <span className="text-xs sm:text-sm leading-snug">{opt}</span>
+                                  <span className="text-xs sm:text-sm leading-snug whitespace-pre-wrap font-sans">{opt}</span>
                                 </button>
                               );
                             })}

@@ -4,7 +4,7 @@ import { api } from '../../lib/api';
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Clock, Calendar, Users, ChevronRight,
-  BookOpen, Info, Plus, Minus
+  BookOpen, Info, Plus, Minus, AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -12,8 +12,8 @@ type AcademicClass = {
   id: string;
   name: string;
   academicYear: string;
-  pcm: { examCoordinatorCpId: string | null };
-  pcb: { examCoordinatorCpId: string | null };
+  pcm: { classStrength: number; sections: { sectionName: string; coordinatorCpId?: string }[] };
+  pcb: { classStrength: number; sections: { sectionName: string; coordinatorCpId?: string }[] };
 };
 
 const DURATION_PRESETS = [
@@ -67,7 +67,6 @@ export function CreateExam() {
     try {
       const payload = {
         ...form,
-        coordinatorCpId: form.coordinatorCpId || undefined,
         scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
       };
       const res = await api.post('/exams', payload);
@@ -356,50 +355,71 @@ export function CreateExam() {
             )}
           </div>
 
-          {/* ── Coordinator ─────────────────────────────────────────────────── */}
+          {/* ── Coordinators ─────────────────────────────────────────────────── */}
           {(() => {
             const selectedClass = classes.find(c => c.id === form.classId);
-            const defaultCoordCpId = selectedClass 
-              ? (form.group === 'PCM' ? selectedClass.pcm.examCoordinatorCpId : selectedClass.pcb.examCoordinatorCpId)
-              : null;
-            const defaultCoordName = defaultCoordCpId 
-              ? (staff.find(s => s.cpId === defaultCoordCpId)?.name || defaultCoordCpId)
-              : null;
+            const groupConfig = form.group === 'PCM' ? selectedClass?.pcm : selectedClass?.pcb;
+            const sections = groupConfig?.sections || [];
 
             return (
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
-                <div className="flex items-start justify-between mb-1">
+                <div className="flex items-start justify-between mb-3">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-widest">
-                    Exam Coordinator
+                    Exam Coordinators
                   </label>
-                  <span className="text-[10px] font-bold text-gray-300 uppercase tracking-wider">Optional</span>
+                  <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                    Class Based
+                  </span>
                 </div>
-                <p className="text-xs text-gray-400 font-medium mb-3 leading-relaxed">
-                  Responsible for marking student attendance, allowing them into the exam room, and monitoring activity.
-                  {defaultCoordName ? (
-                    <span className="block mt-1 text-emerald-600 font-semibold">
-                      ✓ Class default assigned: {defaultCoordName}
-                    </span>
-                  ) : (
-                    <span className="block mt-1 text-amber-500 font-semibold">
-                      ⚠ No default class coordinator. Please select one below or assign later.
-                    </span>
-                  )}
+                <p className="text-xs text-gray-500 font-medium mb-4 leading-relaxed">
+                  Coordinators are assigned separately per section based on the class strength. They monitor their respective sections during the live exam.
                 </p>
-                <select
-                  value={form.coordinatorCpId}
-                  onChange={e => set('coordinatorCpId', e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 outline-none focus:border-gray-300 text-sm font-semibold text-gray-700 transition-colors bg-transparent cursor-pointer"
-                >
-                  <option value="">
-                    {defaultCoordName ? `Use Class Default: ${defaultCoordName}` : 'Select Coordinator...'}
-                  </option>
-                  {staff.map(s => (
-                    <option key={s.cpId} value={s.cpId}>
-                      {s.name} ({s.cpId}) — {s.role === 'TEACHER' ? (s.subject ? `${s.subject.charAt(0) + s.subject.slice(1).toLowerCase()} Teacher` : 'Faculty') : s.role.charAt(0) + s.role.slice(1).toLowerCase()}
-                    </option>
-                  ))}
-                </select>
+
+                {!selectedClass ? (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-center text-sm font-medium text-gray-400">
+                    Select a class above to see assigned coordinators
+                  </div>
+                ) : sections.length === 0 ? (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex flex-col items-center justify-center text-sm font-medium text-gray-400 gap-2">
+                    <p>No sections found for this class and group.</p>
+                    <p className="text-xs text-amber-500 bg-amber-50 px-3 py-1.5 rounded-lg">Ensure you configure class strength and sections in Class Management.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {sections.map(section => {
+                      const coordName = section.coordinatorCpId 
+                        ? (staff.find(s => s.cpId === section.coordinatorCpId)?.name || section.coordinatorCpId)
+                        : null;
+
+                      return (
+                        <div key={section.sectionName} className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm transition-all">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                              Section {section.sectionName}
+                            </span>
+                            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                          </div>
+                          {coordName ? (
+                            <div>
+                              <p className="font-bold text-sm text-gray-900">{coordName}</p>
+                              <p className="text-[11px] text-gray-400 font-mono mt-0.5">{section.coordinatorCpId}</p>
+                            </div>
+                          ) : (
+                            <p className="text-xs font-semibold text-amber-500 flex items-center gap-1.5">
+                              <AlertTriangle size={12} /> Unassigned
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                
+                {sections.some(s => !s.coordinatorCpId) && (
+                  <p className="text-[11px] text-amber-600 font-semibold mt-3 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100/50">
+                    Warning: One or more sections are missing a coordinator. You may proceed, but you should update the class configuration later.
+                  </p>
+                )}
               </div>
             );
           })()}

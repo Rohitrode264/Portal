@@ -302,12 +302,16 @@ export class LiveExamController {
         try {
             const { id } = req.params;
             const userCpId = (req as any).user.userId;
+            const { reason } = req.body;
 
             const session = await ExamSession.findOne({ examId: id, studentCpId: userCpId });
             if (!session || session.status !== 'IN_PROGRESS') return;
 
             session.tabSwitchCount += 1;
-            session.tabSwitchLog.push({ switchedAt: new Date() });
+            session.tabSwitchLog.push({ 
+                switchedAt: new Date(), 
+                reason: reason || 'Tab Switch / Screen Blur' 
+            });
 
             if (session.tabSwitchCount >= 3) {
                 session.status = 'AUTO_SUBMITTED';

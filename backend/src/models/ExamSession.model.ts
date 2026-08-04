@@ -5,6 +5,7 @@ export type SessionStatus = 'ABSENT' | 'PRESENT' | 'IN_PROGRESS' | 'SUBMITTED' |
 export interface ITabSwitch {
     switchedAt: Date;
     returnedAt?: Date;
+    reason?: string;
 }
 
 export interface IAnswer {
@@ -28,7 +29,8 @@ export interface IExamSession extends Document {
 
 const TabSwitchSchema = new Schema<ITabSwitch>({
     switchedAt: { type: Date, required: true },
-    returnedAt: { type: Date }
+    returnedAt: { type: Date },
+    reason: { type: String, default: 'Tab Switch / Lost Focus' }
 }, { _id: false });
 
 const AnswerSchema = new Schema<IAnswer>({

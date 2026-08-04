@@ -231,82 +231,105 @@ export function LiveMonitor() {
                 <p className="text-[12px] font-semibold text-gray-400 uppercase tracking-wider">Roster</p>
                 <p className="text-[12px] text-gray-400">{roster.length} students</p>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="overflow-x-auto">
                 {roster.length === 0 ? (
                   <div className="px-4 py-12 text-center">
                     <p className="text-[14px] text-gray-400">No students found for this class.</p>
                   </div>
-                ) : roster.map(s => {
-                  const online = isOnline(s.heartbeatLastSeen);
-                  const st = STATUS_BADGE[s.status] || STATUS_BADGE.ABSENT;
-                  return (
-                    <div
-                      key={s.studentCpId}
-                      className={[
-                        'px-4 py-3 flex items-center justify-between transition-colors',
-                        s.status === 'ABSENT' && online ? 'bg-amber-50/40' : 'hover:bg-gray-50/60',
-                      ].join(' ')}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={[
-                          'w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0',
-                          s.status === 'SUBMITTED' || s.status === 'AUTO_SUBMITTED'
-                            ? 'bg-gray-100 text-gray-400'
-                            : s.status === 'IN_PROGRESS'
-                            ? 'bg-blue-50 text-blue-600'
-                            : s.status === 'ABSENT' && online
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-gray-100 text-gray-400',
-                        ].join(' ')}>
-                          {s.studentCpId.slice(-3)}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-semibold text-gray-900 truncate">{s.name}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[11px] text-gray-400 font-mono">{s.studentCpId}</span>
-                            {s.status === 'ABSENT' && online && (
-                              <span className="text-[11px] text-amber-500 font-medium">· waiting</span>
-                            )}
-                            {s.status === 'IN_PROGRESS' && (
-                              <span className={['text-[11px] font-medium', online ? 'text-emerald-500' : 'text-amber-500'].join(' ')}>
-                                · {online ? 'online' : 'offline'}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                        {s.tabSwitchCount > 0 && (
-                          <Badge variant={s.tabSwitchCount >= 3 ? 'red' : 'amber'} size="sm">
-                            {s.tabSwitchCount} strike{s.tabSwitchCount > 1 ? 's' : ''}
-                          </Badge>
-                        )}
-                        {s.status === 'ABSENT' ? (
-                          <button
-                            onClick={() => handleMarkPresentDirect(s.studentCpId)}
-                            className={[
-                              'h-7 px-2.5 rounded-lg text-[12px] font-semibold transition-colors',
-                              online
-                                ? 'bg-gray-900 text-white hover:bg-black'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                            ].join(' ')}
+                ) : (
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-100">
+                        <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Student</th>
+                        <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                        <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-center">Violation Credits</th>
+                        <th className="px-4 py-3 text-[11px] font-bold text-gray-400 uppercase tracking-wider text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {[...roster]
+                        .sort((a, b) => b.tabSwitchCount - a.tabSwitchCount)
+                        .map(s => {
+                        const online = isOnline(s.heartbeatLastSeen);
+                        const st = STATUS_BADGE[s.status] || STATUS_BADGE.ABSENT;
+                        const creditsLeft = Math.max(0, 3 - s.tabSwitchCount);
+                        
+                        return (
+                          <tr
+                            key={s.studentCpId}
+                            className={`transition-colors ${s.status === 'ABSENT' && online ? 'bg-amber-50/40' : 'hover:bg-gray-50/60'}`}
                           >
-                            Allow
-                          </button>
-                        ) : (
-                          <>
-                            {s.status === 'SUBMITTED' && <CheckCircle2 size={16} className="text-emerald-500" />}
-                            {s.status === 'AUTO_SUBMITTED' && <AlertTriangle size={16} className="text-red-400" />}
-                            {(s.status === 'PRESENT' || s.status === 'IN_PROGRESS') && (
-                              <Badge variant={st.variant} size="sm">{st.label}</Badge>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className={[
+                                  'w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0',
+                                  s.status === 'SUBMITTED' || s.status === 'AUTO_SUBMITTED'
+                                    ? 'bg-gray-100 text-gray-400'
+                                    : s.status === 'IN_PROGRESS'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : s.status === 'ABSENT' && online
+                                    ? 'bg-amber-100 text-amber-700'
+                                    : 'bg-gray-100 text-gray-400',
+                                ].join(' ')}>
+                                  {s.studentCpId.slice(-3)}
+                                </div>
+                                <div>
+                                  <p className="text-[13px] font-semibold text-gray-900">{s.name}</p>
+                                  <span className="text-[11px] text-gray-400 font-mono">{s.studentCpId}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                {s.status === 'ABSENT' && online ? (
+                                  <span className="text-[11px] text-amber-500 font-medium">waiting</span>
+                                ) : s.status === 'IN_PROGRESS' ? (
+                                  <span className={['text-[11px] font-medium', online ? 'text-emerald-500' : 'text-amber-500'].join(' ')}>
+                                    {online ? 'online' : 'offline'}
+                                  </span>
+                                ) : null}
+                                {s.status === 'SUBMITTED' && <CheckCircle2 size={16} className="text-emerald-500 inline mr-1" />}
+                                {s.status === 'AUTO_SUBMITTED' && <AlertTriangle size={16} className="text-red-400 inline mr-1" />}
+                                {(s.status === 'PRESENT' || s.status === 'IN_PROGRESS') && (
+                                  <Badge variant={st.variant} size="sm">{st.label}</Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex justify-center">
+                                <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold font-mono border ${
+                                  creditsLeft === 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                  creditsLeft === 2 ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                  creditsLeft === 1 ? 'bg-orange-50 text-orange-700 border-orange-100' :
+                                  'bg-red-50 text-red-600 border-red-200 animate-pulse'
+                                }`}>
+                                  {creditsLeft} / 3
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              {s.status === 'ABSENT' ? (
+                                <button
+                                  onClick={() => handleMarkPresentDirect(s.studentCpId)}
+                                  className={[
+                                    'h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors',
+                                    online
+                                      ? 'bg-gray-900 text-white hover:bg-black'
+                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                                  ].join(' ')}
+                                >
+                                  Allow
+                                </button>
+                              ) : (
+                                <span className="text-[11px] text-gray-400 font-medium">No Action</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
           </div>
