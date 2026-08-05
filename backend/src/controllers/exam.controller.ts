@@ -23,7 +23,7 @@ export class ExamController {
                 return;
             }
 
-            // Check if duplicate exam exists within 24 hours for the same class/group
+            // Check if overlapping exam exists for the same class/group
             if (scheduledAt) {
                 const scheduleDate = new Date(scheduledAt);
                 const startOfDay = new Date(scheduleDate);
@@ -31,17 +31,27 @@ export class ExamController {
                 const endOfDay = new Date(scheduleDate);
                 endOfDay.setHours(23, 59, 59, 999);
 
-                const existingExam = await Exam.findOne({
+                const existingExams = await Exam.find({
                     classId,
                     group,
                     scheduledAt: { $gte: startOfDay, $lte: endOfDay },
-                    status: { $ne: 'ARCHIVED' }
+                    status: { $nin: ['ARCHIVED', 'COMPLETED'] }
                 });
 
-                if (existingExam) {
+                const newStart = scheduleDate.getTime();
+                const newEnd = newStart + duration * 60 * 1000;
+
+                const overlappingExam = existingExams.find(exam => {
+                    if (!exam.scheduledAt) return false;
+                    const existingStart = exam.scheduledAt.getTime();
+                    const existingEnd = existingStart + exam.duration * 60 * 1000;
+                    return newStart < existingEnd && newEnd > existingStart;
+                });
+
+                if (overlappingExam) {
                     res.status(409).json({ 
-                        error: `An exam for this class and group already exists on this date.`,
-                        existingExamId: existingExam._id
+                        error: `An exam for this class and group is already scheduled during this time.`,
+                        existingExamId: overlappingExam._id
                     });
                     return;
                 }
@@ -102,6 +112,43 @@ export class ExamController {
             if (exam.status !== 'DRAFT' && exam.status !== 'LOCKED') {
                 res.status(400).json({ error: 'Only DRAFT or LOCKED exams can be edited' });
                 return;
+            }
+
+            const newScheduledAt = scheduledAt !== undefined ? (scheduledAt ? new Date(scheduledAt) : undefined) : exam.scheduledAt;
+            const newDuration = duration !== undefined ? duration : exam.duration;
+
+            if (newScheduledAt) {
+                const scheduleDate = new Date(newScheduledAt);
+                const startOfDay = new Date(scheduleDate);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(scheduleDate);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const existingExams = await Exam.find({
+                    _id: { $ne: exam._id },
+                    classId: exam.classId,
+                    group: exam.group,
+                    scheduledAt: { $gte: startOfDay, $lte: endOfDay },
+                    status: { $nin: ['ARCHIVED', 'COMPLETED'] }
+                });
+
+                const newStart = scheduleDate.getTime();
+                const newEnd = newStart + newDuration * 60 * 1000;
+
+                const overlappingExam = existingExams.find(e => {
+                    if (!e.scheduledAt) return false;
+                    const existingStart = e.scheduledAt.getTime();
+                    const existingEnd = existingStart + e.duration * 60 * 1000;
+                    return newStart < existingEnd && newEnd > existingStart;
+                });
+
+                if (overlappingExam) {
+                    res.status(409).json({ 
+                        error: `An exam for this class and group is already scheduled during this time.`,
+                        existingExamId: overlappingExam._id
+                    });
+                    return;
+                }
             }
 
             if (title !== undefined) exam.title = title;
