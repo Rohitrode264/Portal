@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, FileText, BarChart2, Award, BookOpen, Users, Calendar } from 'lucide-react';
+import { ArrowLeft, Printer, FileText, BarChart2, Award, BookOpen, Users, Calendar, UserRound } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { api } from '../../lib/api';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
@@ -90,18 +90,18 @@ export function StudentProfilePage() {
         <DashboardLayout>
             <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
                 {/* Header Banner */}
-                <div className="relative rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-700 h-48 w-full shadow-lg overflow-hidden">
-                    <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white opacity-10"></div>
-                    <div className="absolute bottom-0 right-40 -mb-20 w-40 h-40 rounded-full bg-white opacity-10"></div>
+                <div className="relative rounded-[2rem] bg-blue-50 h-48 w-full shadow-sm overflow-hidden border border-blue-100/50">
+                    <div className="absolute top-0 right-0 -mr-20 -mt-20 w-72 h-72 rounded-full bg-blue-100/50 blur-3xl"></div>
+                    <div className="absolute bottom-0 left-20 -mb-20 w-56 h-56 rounded-full bg-indigo-100/40 blur-2xl"></div>
                     
-                    <button onClick={() => navigate('/students')} className="absolute top-6 left-6 p-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white transition-all">
+                    <button onClick={() => navigate('/students')} className="absolute top-6 left-6 p-2.5 bg-white/60 hover:bg-white backdrop-blur-md border border-white/40 rounded-full text-gray-700 hover:text-gray-900 shadow-sm transition-all">
                         <ArrowLeft size={20} />
                     </button>
                     
                     <div className="absolute top-6 right-6">
                         <button 
                             onClick={triggerCumulativePrint} 
-                            className="flex items-center gap-2 px-5 py-2.5 bg-white text-indigo-700 font-bold rounded-xl shadow-[0_4px_14px_0_rgba(255,255,255,0.2)] hover:shadow-[0_6px_20px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 transition-all duration-200"
+                            className="flex items-center gap-2 px-5 py-2.5 bg-white/80 backdrop-blur-md text-blue-700 font-bold rounded-2xl shadow-sm border border-white hover:bg-white hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                         >
                             <Printer size={18} /> Print Cumulative (A5)
                         </button>
@@ -112,46 +112,46 @@ export function StudentProfilePage() {
                     
                     {/* Left Column - Profile Card */}
                     <div className="lg:col-span-1 space-y-6">
-                        <div className="card p-6 shadow-xl relative bg-white border border-gray-100">
-                            <div className="absolute -top-12 left-6 w-24 h-24 rounded-2xl bg-white p-1.5 shadow-lg">
-                                <div className="w-full h-full bg-gradient-to-br from-indigo-100 to-blue-50 rounded-xl flex items-center justify-center text-indigo-600 text-3xl font-extrabold tracking-tight">
-                                    {profile.name.charAt(0)}
+                        <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100/80 relative mt-2 hover:shadow-md transition-shadow">
+                            <div className="absolute -top-14 left-6 w-28 h-28 rounded-full bg-white p-2 shadow-sm border border-gray-50">
+                                <div className="w-full h-full bg-blue-50 rounded-full flex items-center justify-center text-blue-600">
+                                    <UserRound size={48} strokeWidth={2.5} />
                                 </div>
                             </div>
                             
-                            <div className="pt-14 pb-2">
-                                <h1 className="text-2xl font-bold text-gray-900 leading-tight">{profile.name}</h1>
-                                <p className="text-sm font-semibold text-indigo-600 mt-1 mb-6 flex items-center gap-1.5">
+                            <div className="pt-16 pb-2">
+                                <h1 className="text-2xl font-black text-gray-900 tracking-tight leading-tight">{profile.name}</h1>
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-green-50 text-green-700 mt-2 mb-6 border border-green-100/50">
                                     <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                                    ID: {profile.admissionNumber}
-                                </p>
+                                    <span className="text-[11px] font-bold uppercase tracking-wider">ID: {profile.admissionNumber}</span>
+                                </div>
                                 
-                                <div className="space-y-4 pt-4 border-t border-gray-100">
-                                    <div className="flex items-center gap-3.5 text-sm">
-                                        <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                                            <BookOpen size={16} />
+                                <div className="space-y-1 pt-2">
+                                    <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-colors">
+                                        <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
+                                            <BookOpen size={18} />
                                         </div>
                                         <div>
-                                            <div className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-0.5">Class & Group</div>
-                                            <div className="font-semibold text-gray-900">{profile.className} <span className="text-gray-300 mx-1">•</span> <span className="text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">{profile.cetBucket}</span></div>
+                                            <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Class & Group</div>
+                                            <div className="font-bold text-gray-900 text-sm">{profile.className} <span className="text-gray-300 mx-1">•</span> <span className="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-xs">{profile.cetBucket}</span></div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3.5 text-sm">
-                                        <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                                            <Users size={16} />
+                                    <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-colors">
+                                        <div className="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 shrink-0">
+                                            <Users size={18} />
                                         </div>
                                         <div>
-                                            <div className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-0.5">Batch / Section</div>
-                                            <div className="font-semibold text-gray-900">{profile.section || 'Not assigned'}</div>
+                                            <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Batch / Section</div>
+                                            <div className="font-bold text-gray-900 text-sm">{profile.section || 'Not assigned'}</div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3.5 text-sm">
-                                        <div className="w-9 h-9 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shrink-0">
-                                            <Calendar size={16} />
+                                    <div className="flex items-center gap-4 p-3 rounded-2xl hover:bg-gray-50 transition-colors">
+                                        <div className="w-10 h-10 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 shrink-0">
+                                            <Calendar size={18} />
                                         </div>
                                         <div>
-                                            <div className="text-gray-400 text-[11px] font-bold uppercase tracking-wider mb-0.5">Academic Year</div>
-                                            <div className="font-semibold text-gray-900">{profile.academicYear}</div>
+                                            <div className="text-gray-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Academic Year</div>
+                                            <div className="font-bold text-gray-900 text-sm">{profile.academicYear}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -162,74 +162,114 @@ export function StudentProfilePage() {
                     {/* Right Column - Stats & History */}
                     <div className="lg:col-span-2 space-y-6">
                         
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-20 lg:pt-0">
-                            <div className="card p-5 flex flex-col items-center justify-center bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-300 group">
-                                <BarChart2 className="mb-2 text-blue-500 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" size={26} />
-                                <div className="text-2xl font-bold text-gray-900">{exams.length}</div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Exams Taken</div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-16 lg:pt-2">
+                            <div className="bg-gradient-to-br from-blue-50/80 to-blue-100/50 rounded-3xl p-5 flex flex-col justify-between border border-blue-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 text-blue-600">
+                                    <BarChart2 size={100} />
+                                </div>
+                                <div className="flex items-center gap-3 mb-4 relative z-10">
+                                    <div className="w-9 h-9 rounded-2xl bg-white text-blue-600 flex items-center justify-center shadow-sm">
+                                        <BarChart2 size={18} />
+                                    </div>
+                                    <div className="text-[10px] font-extrabold text-blue-800/80 uppercase tracking-widest leading-tight">Exams<br/>Taken</div>
+                                </div>
+                                <div className="text-3xl font-black text-blue-950 tracking-tight relative z-10">{exams.length}</div>
                             </div>
-                            <div className="card p-5 flex flex-col items-center justify-center bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-green-200 transition-all duration-300 group">
-                                <FileText className="mb-2 text-green-500 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" size={26} />
-                                <div className="text-2xl font-bold text-gray-900">{avgScore}%</div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Avg Score</div>
+
+                            <div className="bg-gradient-to-br from-emerald-50/80 to-emerald-100/50 rounded-3xl p-5 flex flex-col justify-between border border-emerald-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 text-emerald-600">
+                                    <FileText size={100} />
+                                </div>
+                                <div className="flex items-center gap-3 mb-4 relative z-10">
+                                    <div className="w-9 h-9 rounded-2xl bg-white text-emerald-600 flex items-center justify-center shadow-sm">
+                                        <FileText size={18} />
+                                    </div>
+                                    <div className="text-[10px] font-extrabold text-emerald-800/80 uppercase tracking-widest leading-tight">Avg<br/>Score</div>
+                                </div>
+                                <div className="text-3xl font-black text-emerald-950 tracking-tight relative z-10">{avgScore}%</div>
                             </div>
-                            <div className="card p-5 flex flex-col items-center justify-center bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition-all duration-300 group">
-                                <Award className="mb-2 text-purple-500 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" size={26} />
-                                <div className="text-2xl font-bold text-gray-900">#{bestRank}</div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Best Rank</div>
+
+                            <div className="bg-gradient-to-br from-purple-50/80 to-purple-100/50 rounded-3xl p-5 flex flex-col justify-between border border-purple-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 text-purple-600">
+                                    <Award size={100} />
+                                </div>
+                                <div className="flex items-center gap-3 mb-4 relative z-10">
+                                    <div className="w-9 h-9 rounded-2xl bg-white text-purple-600 flex items-center justify-center shadow-sm">
+                                        <Award size={18} />
+                                    </div>
+                                    <div className="text-[10px] font-extrabold text-purple-800/80 uppercase tracking-widest leading-tight">Best<br/>Rank</div>
+                                </div>
+                                <div className="text-3xl font-black text-purple-950 tracking-tight relative z-10">#{bestRank}</div>
                             </div>
-                            <div className="card p-5 flex flex-col items-center justify-center bg-white border border-gray-100 shadow-sm hover:shadow-md hover:border-amber-200 transition-all duration-300 group">
-                                <BarChart2 className="mb-2 text-amber-500 group-hover:scale-110 group-hover:-translate-y-1 transition-transform duration-300" size={26} />
-                                <div className="text-2xl font-bold text-gray-900">{bestPercentile}</div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Top Percentile</div>
+
+                            <div className="bg-gradient-to-br from-amber-50/80 to-amber-100/50 rounded-3xl p-5 flex flex-col justify-between border border-amber-100/60 shadow-[0_2px_10px_rgba(0,0,0,0.02)] hover:shadow-md hover:-translate-y-1 transition-all duration-300 relative overflow-hidden group">
+                                <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 group-hover:rotate-6 transition-transform duration-500 text-amber-600">
+                                    <BarChart2 size={100} />
+                                </div>
+                                <div className="flex items-center gap-3 mb-4 relative z-10">
+                                    <div className="w-9 h-9 rounded-2xl bg-white text-amber-600 flex items-center justify-center shadow-sm">
+                                        <BarChart2 size={18} />
+                                    </div>
+                                    <div className="text-[10px] font-extrabold text-amber-800/80 uppercase tracking-widest leading-tight">Top<br/>Percentile</div>
+                                </div>
+                                <div className="text-3xl font-black text-amber-950 tracking-tight relative z-10">{bestPercentile}</div>
                             </div>
                         </div>
 
-                        <div className="card overflow-hidden shadow-sm border border-gray-100">
-                            <div className="px-6 py-4 border-b border-gray-100 bg-white">
-                                <h2 className="text-lg font-bold text-gray-900">Exam History</h2>
+                        <div className="bg-white rounded-3xl overflow-hidden shadow-sm border border-gray-100/80">
+                            <div className="px-6 py-5 border-b border-gray-50 flex items-center justify-between">
+                                <h2 className="text-lg font-black text-gray-900 tracking-tight">Exam History</h2>
                             </div>
-                            <div className="overflow-x-auto bg-white">
+                            <div className="overflow-x-auto">
                                 <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50 border-b border-gray-100">
-                            <th className="px-6 py-4 text-label">Exam Title</th>
-                            <th className="px-6 py-4 text-label">Score</th>
-                            <th className="px-6 py-4 text-label">Rank / Total</th>
-                            <th className="px-6 py-4 text-label">Percentile</th>
-                            <th className="px-6 py-4 text-label text-right">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {exams.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No exams taken yet.</td>
-                            </tr>
-                        ) : exams.map((exam) => (
-                            <tr key={exam.examId} className="hover:bg-gray-50 transition-colors">
-                                <td className="px-6 py-4">
-                                    <div className="font-medium text-gray-900">{exam.title}</div>
-                                    <div className="text-xs text-gray-500">{new Date(exam.scheduledAt).toLocaleDateString()}</div>
-                                </td>
-                                <td className="px-6 py-4 font-semibold">
-                                    {exam.score} / {exam.maxMarks}
-                                    <div className="text-xs text-gray-500 font-normal">
-                                        C:{exam.correct} W:{exam.wrong} U:{exam.unattempted}
-                                    </div>
-                                </td>
-                                <td className="px-6 py-4 font-medium">#{exam.rank} <span className="text-gray-400 font-normal">/ {exam.totalAttended}</span></td>
-                                <td className="px-6 py-4 font-semibold text-blue-600">{exam.percentile}</td>
-                                <td className="px-6 py-4 text-right">
-                                    <button 
-                                        onClick={() => triggerExamPrint(exam)}
-                                        className="py-1.5 px-3 text-sm flex items-center gap-1.5 ml-auto bg-white border border-gray-200 text-gray-700 font-medium rounded-lg shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                                    >
-                                        <Printer size={14} className="text-gray-500" /> Print Exam A5
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
+                                    <thead>
+                                        <tr className="bg-gray-50/50">
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Exam Title</th>
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Score</th>
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Rank / Total</th>
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Percentile</th>
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {exams.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-12 text-center text-gray-400 font-medium text-sm">No exams taken yet.</td>
+                                            </tr>
+                                        ) : exams.map((exam) => (
+                                            <tr key={exam.examId} className="hover:bg-blue-50/30 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-gray-900 text-sm">{exam.title}</div>
+                                                    <div className="text-xs text-gray-500 font-medium mt-0.5">{new Date(exam.scheduledAt).toLocaleDateString()}</div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-black text-gray-900 text-sm">{exam.score} <span className="text-gray-400 font-medium text-xs">/ {exam.maxMarks}</span></div>
+                                                    <div className="text-[10px] text-gray-500 font-bold tracking-wide mt-0.5 flex gap-1.5">
+                                                        <span className="text-emerald-600">C:{exam.correct}</span>
+                                                        <span className="text-red-500">W:{exam.wrong}</span>
+                                                        <span className="text-gray-400">U:{exam.unattempted}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-black text-gray-900 text-sm">#{exam.rank}</span>
+                                                    <span className="text-gray-400 font-medium text-xs ml-1">/ {exam.totalAttended}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="inline-flex px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-black">
+                                                        {exam.percentile}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <button 
+                                                        onClick={() => triggerExamPrint(exam)}
+                                                        className="py-2 px-4 text-xs inline-flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 font-bold rounded-xl shadow-sm hover:bg-gray-50 hover:border-gray-300 hover:text-gray-900 transition-all"
+                                                    >
+                                                        <Printer size={14} className="text-gray-500" /> Print
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
                                 </table>
                             </div>
                         </div>

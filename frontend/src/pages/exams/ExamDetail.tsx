@@ -47,6 +47,7 @@ type Exam = {
   isClassDefaultCoordinator?: boolean;
   sections: Section[];
   createdByFields?: { name: string; cpId: string };
+  canMonitor?: boolean;
 };
 
 type QForm = {
@@ -681,7 +682,7 @@ export function ExamDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {(exam.status === 'LIVE' || exam.status === 'PUBLISHED') && (
+            {(exam.status === 'LIVE' || exam.status === 'PUBLISHED') && exam.canMonitor && (
               <button
                 onClick={() => navigate(`/exams/${exam._id}/monitor`)}
                 className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all"

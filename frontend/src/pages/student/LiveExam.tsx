@@ -16,6 +16,7 @@ export function LiveExam() {
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalStage, setApprovalStage] = useState<'waiting_coordinator' | 'verified_present'>('waiting_coordinator');
   const [activeSubject, setActiveSubject] = useState<string>('');
+  const [showRules, setShowRules] = useState(true);
 
   // Tab tracking
   const [warningCount, setWarningCount] = useState(0);
@@ -362,13 +363,64 @@ export function LiveExam() {
 
   return (
     <div 
-      className="min-h-screen bg-slate-50 select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [user-select:none] [touch-action:manipulation] [overscroll-behavior-y:none] relative overflow-hidden"
+      className="min-h-[100dvh] bg-slate-50 select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [user-select:none] [touch-action:manipulation] relative overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch]"
       onCopy={e => e.preventDefault()}
       onCut={e => e.preventDefault()}
       onPaste={e => e.preventDefault()}
       onContextMenu={e => e.preventDefault()}
       onDragStart={e => e.preventDefault()}
     >
+      {/* ── Rules Modal Overlay (Google Design Standard) ── */}
+      {showRules && (
+        <div className="fixed inset-0 z-[200] bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+            <div className="bg-blue-600 px-6 py-5 flex items-center gap-3">
+              <ShieldAlert className="text-white" size={24} />
+              <h2 className="text-lg font-black text-white tracking-tight">Exam Rules & Guidelines</h2>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[60vh] space-y-5">
+              <p className="text-sm text-gray-600 font-medium leading-relaxed">
+                Please read the following instructions carefully before starting your exam. Violation of these rules will result in immediate penalties.
+              </p>
+              
+              <div className="bg-red-50 border border-red-100 rounded-2xl p-4 flex gap-3 shadow-sm">
+                <div className="mt-0.5"><AlertTriangle size={18} className="text-red-500" /></div>
+                <div>
+                  <h3 className="text-sm font-bold text-red-800 uppercase tracking-tight mb-1">Violation Credits System</h3>
+                  <p className="text-xs text-red-700 leading-relaxed font-medium">
+                    You have exactly <strong>3 violation credits</strong>. Every time you leave the exam screen, switch tabs, open another app, or trigger a split-screen, 1 credit is deducted. 
+                    <strong> When all 3 credits are ruined, your test will auto-submit immediately.</strong>
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4 pt-2">
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">1</div>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>No Tab Switching:</strong> Navigating away from the test tab will trigger a security alert and deduct a violation credit.</p>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">2</div>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>No Split Screen / Resize:</strong> Resizing the window or opening split-screen apps (like WhatsApp, AI assistants, or floating calculators) is strictly prohibited.</p>
+                </div>
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">3</div>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>Do Not Close the Browser:</strong> If you accidentally close the browser, your session will be locked, and you must report to the coordinator.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setShowRules(false)}
+                className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 hover:shadow-md transition-all flex items-center gap-2"
+              >
+                <CheckCircle2 size={18} /> I Understand, Start Exam
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Security Overlay Redesign (Google Standard) ── */}
       {(isBlurred || isSplitScreen) && (
         <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none">

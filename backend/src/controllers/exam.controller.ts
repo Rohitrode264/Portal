@@ -154,6 +154,21 @@ export class ExamController {
             const creator = await User.findOne({ cpId: exam.createdBy }).select('name');
             const examObj = exam.toObject() as any;
             examObj.createdByFields = creator ? { name: creator.name, cpId: exam.createdBy } : { name: exam.createdBy, cpId: exam.createdBy };
+            
+            const userRole = (req as any).user.role;
+            const userCpId = (req as any).user.userId;
+            
+            let canMonitor = false;
+            if (userRole === 'ADMIN') {
+                canMonitor = true;
+            } else if (userRole === 'TEACHER') {
+                const config = await ClassConfig.findOne({ classId: exam.classId, group: exam.group });
+                if (config) {
+                    canMonitor = config.sections.some(s => s.coordinatorCpId === userCpId);
+                }
+            }
+            examObj.canMonitor = canMonitor;
+
             res.json({ exam: examObj });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to fetch exam' });

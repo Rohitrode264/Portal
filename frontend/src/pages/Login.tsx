@@ -66,7 +66,7 @@ export function LoginPage() {
       setErrorMessage('');
       const res = await api.post('/auth/forgot-password-init', { identifier });
       toast.success(res.data.message);
-      setUserData({ ...userData, message: res.data.message } as any);
+      setUserData({ ...userData, message: res.data.message, cpId: res.data.cpId } as any);
       setStep('FORGOT_VERIFY');
       setOtp(['', '', '', '', '', '']);
     } catch (error: any) {
@@ -87,7 +87,7 @@ export function LoginPage() {
       if (otpCode.length !== 6) { toast.error('Enter a valid 6-digit verification code'); return; }
       if (newPassword.length < 6) { toast.error('Password must be at least 6 characters'); return; }
       const res = await api.post('/auth/forgot-password-verify', {
-        cpId: identifier,
+        cpId: userData?.cpId || identifier,
         otp: otpCode,
         newPassword
       });
