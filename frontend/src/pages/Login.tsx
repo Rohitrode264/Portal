@@ -17,7 +17,7 @@ export function LoginPage() {
   const [newPassword, setNewPassword] = useState('');
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
-  const [userData, setUserData] = useState<{ name: string; role: string; message: string; alreadySent?: boolean } | null>(null);
+  const [userData, setUserData] = useState<{ name?: string; role?: string; message: string; alreadySent?: boolean; cpId?: string } | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
 
   const { login, isAuthenticated } = useAuth();
@@ -66,7 +66,7 @@ export function LoginPage() {
       setErrorMessage('');
       const res = await api.post('/auth/forgot-password-init', { identifier });
       toast.success(res.data.message);
-      setUserData({ ...userData, message: res.data.message, cpId: res.data.cpId } as any);
+      setUserData(prev => ({ ...(prev || {}), message: res.data.message, cpId: res.data.cpId }));
       setStep('FORGOT_VERIFY');
       setOtp(['', '', '', '', '', '']);
     } catch (error: any) {
