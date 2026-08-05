@@ -363,12 +363,11 @@ export function LiveExam() {
 
   return (
     <div 
-      className="min-h-[100dvh] bg-slate-50 select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [user-select:none] [touch-action:manipulation] relative overflow-y-auto overflow-x-hidden [-webkit-overflow-scrolling:touch]"
+      className="min-h-screen bg-slate-50 select-none [-webkit-touch-callout:none] [-webkit-user-select:none] [user-select:none] relative pb-20"
       onCopy={e => e.preventDefault()}
       onCut={e => e.preventDefault()}
       onPaste={e => e.preventDefault()}
       onContextMenu={e => e.preventDefault()}
-      onDragStart={e => e.preventDefault()}
     >
       {/* ── Rules Modal Overlay (Google Design Standard) ── */}
       {showRules && (
@@ -388,8 +387,8 @@ export function LiveExam() {
                 <div>
                   <h3 className="text-sm font-bold text-red-800 uppercase tracking-tight mb-1">Violation Credits System</h3>
                   <p className="text-xs text-red-700 leading-relaxed font-medium">
-                    You have exactly <strong>3 violation credits</strong>. Every time you leave the exam screen, switch tabs, open another app, or trigger a split-screen, 1 credit is deducted. 
-                    <strong> When all 3 credits are ruined, your test will auto-submit immediately.</strong>
+                    You have exactly <strong>5 violation credits</strong>. Every time you leave the exam screen, switch tabs, open another app, or trigger a split-screen, 1 credit is deducted. 
+                    <strong> When all 5 credits are ruined, your test will auto-submit immediately.</strong>
                   </p>
                 </div>
               </div>
@@ -438,8 +437,8 @@ export function LiveExam() {
             </p>
             <div className="bg-red-50 border border-red-200 px-6 py-4 rounded-2xl w-full text-center">
               <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Violation Strike</p>
-              <p className="text-2xl font-black text-red-600 font-mono">{warningCount} / 3</p>
-              <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider mt-1">Auto-submit on 3rd violation</p>
+              <p className="text-2xl font-black text-red-600 font-mono">{warningCount} / 5</p>
+              <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider mt-1">Auto-submit on 5th violation</p>
             </div>
           </div>
         </div>
@@ -465,17 +464,17 @@ export function LiveExam() {
           <div className="flex items-center gap-3 flex-wrap">
             {/* Prominent Violation Credits Badge on top */}
             {(() => {
-              const creditsLeft = Math.max(0, 3 - warningCount);
+              const creditsLeft = Math.max(0, 5 - warningCount);
               return (
                 <div className={`px-3 py-1.5 rounded-xl flex items-center gap-2 text-xs font-black border shadow-2xs transition-all ${
-                  creditsLeft === 3
+                  creditsLeft >= 4
                     ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                    : creditsLeft === 2
+                    : creditsLeft >= 2
                     ? 'bg-amber-50 text-amber-800 border-amber-200'
                     : 'bg-red-50 text-red-600 border-red-200 animate-pulse'
                 }`}>
-                  {creditsLeft === 3 ? <ShieldCheck size={16} className="text-emerald-600" /> : <ShieldAlert size={16} className={creditsLeft === 2 ? 'text-amber-600' : 'text-red-500'} />}
-                  <span>VIOLATION CREDITS: <strong className="font-mono text-sm font-black">{creditsLeft}</strong>/3 LEFT</span>
+                  {creditsLeft >= 4 ? <ShieldCheck size={16} className="text-emerald-600" /> : <ShieldAlert size={16} className={creditsLeft >= 2 ? 'text-amber-600' : 'text-red-500'} />}
+                  <span>VIOLATION CREDITS: <strong className="font-mono text-sm font-black">{creditsLeft}</strong>/5 LEFT</span>
                 </div>
               );
             })()}

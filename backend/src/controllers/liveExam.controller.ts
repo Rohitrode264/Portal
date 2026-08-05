@@ -349,14 +349,14 @@ export class LiveExamController {
                 reason: reason || 'Tab Switch / Screen Blur' 
             });
 
-            if (session.tabSwitchCount >= 3) {
+            if (session.tabSwitchCount >= 5) {
                 session.status = 'AUTO_SUBMITTED';
                 session.submittedAt = new Date();
                 await session.save();
                 await Session.updateOne({ userId: userCpId }, { isExamLocked: false, lockedExamId: null });
                 res.json({ 
                     autoSubmitted: true, 
-                    message: 'Exam auto-submitted due to maximum tab switches (3).' 
+                    message: 'Exam auto-submitted due to maximum tab switches (5).' 
                 });
                 return;
             }
@@ -364,7 +364,7 @@ export class LiveExamController {
             await session.save();
             res.json({ 
                 warningCount: session.tabSwitchCount,
-                message: `Warning ${session.tabSwitchCount}/2. Your exam will be auto-submitted on the 3rd violation.`
+                message: `Warning ${session.tabSwitchCount}/4. Your exam will be auto-submitted on the 5th violation.`
             });
         } catch (error) {
             res.status(500).json({ error: 'Failed to report tab switch' });
