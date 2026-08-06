@@ -208,7 +208,7 @@ export class ExamController {
             let canMonitor = false;
             if (userRole === 'ADMIN') {
                 canMonitor = true;
-            } else if (userRole === 'TEACHER') {
+            } else if (userRole === 'TEACHER' || userRole === 'ASSISTANT') {
                 const config = await ClassConfig.findOne({ classId: exam.classId, group: exam.group });
                 if (config) {
                     canMonitor = config.sections.some(s => s.coordinatorCpId === userCpId);
