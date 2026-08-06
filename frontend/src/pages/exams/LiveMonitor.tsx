@@ -311,14 +311,15 @@ export function LiveMonitor() {
                               {s.status === 'ABSENT' ? (
                                 <button
                                   onClick={() => handleMarkPresentDirect(s.studentCpId)}
+                                  disabled={!online}
                                   className={[
-                                    'h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors',
+                                    'h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors disabled:opacity-50',
                                     online
-                                      ? 'bg-gray-900 text-white hover:bg-black'
-                                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                                      ? 'bg-gray-900 text-white hover:bg-black cursor-pointer'
+                                      : 'bg-gray-100 text-gray-400 cursor-not-allowed',
                                   ].join(' ')}
                                 >
-                                  Allow
+                                  {online ? 'Allow' : 'Offline'}
                                 </button>
                               ) : (
                                 <span className="text-[11px] text-gray-400 font-medium">No Action</span>

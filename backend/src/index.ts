@@ -37,10 +37,17 @@ app.get('/health', (req, res) => {
     res.json({ status: 'OK', service: 'Portal API' });
 });
 
+import { autoEndExams } from './controllers/liveExam.controller';
+
 const PORT = process.env.PORT || 4000;
 
 connectDB().then(() => {
     app.listen(PORT, () => {
         console.log(`Portal Backend Server running on port ${PORT}`);
+        
+        // Check for exams that have reached their time limit and end them automatically every 30 seconds
+        setInterval(() => {
+            autoEndExams();
+        }, 30000);
     });
 });
