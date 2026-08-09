@@ -252,7 +252,7 @@ export function LiveMonitor() {
                         .map(s => {
                         const online = isOnline(s.heartbeatLastSeen);
                         const st = STATUS_BADGE[s.status] || STATUS_BADGE.ABSENT;
-                        const creditsLeft = Math.max(0, 3 - s.tabSwitchCount);
+                        const creditsLeft = Math.max(0, 5 - s.tabSwitchCount);
                         
                         return (
                           <tr
@@ -298,12 +298,12 @@ export function LiveMonitor() {
                             <td className="px-4 py-3 text-center">
                               <div className="flex justify-center">
                                 <span className={`px-2.5 py-1 rounded-md text-[11px] font-bold font-mono border ${
-                                  creditsLeft === 3 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
-                                  creditsLeft === 2 ? 'bg-amber-50 text-amber-700 border-amber-100' :
+                                  creditsLeft >= 4 ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                  creditsLeft >= 2 ? 'bg-amber-50 text-amber-700 border-amber-100' :
                                   creditsLeft === 1 ? 'bg-orange-50 text-orange-700 border-orange-100' :
                                   'bg-red-50 text-red-600 border-red-200 animate-pulse'
                                 }`}>
-                                  {creditsLeft} / 3
+                                  {creditsLeft} / 5
                                 </span>
                               </div>
                             </td>
