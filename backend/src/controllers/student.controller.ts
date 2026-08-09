@@ -164,7 +164,25 @@ export class StudentController {
         try {
             const studentCpId = (req as any).user.userId;
 
+            const student = await Student.findOne({ admissionNumber: studentCpId });
+            if (!student) {
+                res.status(404).json({ error: 'Student not found' });
+                return;
+            }
+
+            const enrollment = await Enrollment.findOne({
+                studentId: student._id,
+                status: 'ONGOING'
+            });
+
+            if (!enrollment || !student.cetBucket) {
+                res.json({ exams: [] });
+                return;
+            }
+
             const exams = await Exam.find({
+                classId: enrollment.academicClassId,
+                group: student.cetBucket,
                 status: { $in: ['PUBLISHED', 'LIVE', 'COMPLETED'] }
             }).sort({ scheduledAt: 1 });
 
