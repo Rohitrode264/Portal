@@ -275,8 +275,8 @@ export class StudentController {
             const totalAttended = studentScores.length;
             const myRankIdx = studentScores.findIndex(x => x.totalScore === myScore);
             const rank = myRankIdx >= 0 ? myRankIdx + 1 : totalAttended;
-            const countBelow = studentScores.filter(x => x.totalScore < myScore).length;
-            const percentile = totalAttended > 0 ? Number(((countBelow / totalAttended) * 100).toFixed(2)) : 0;
+            const countEqualOrBelow = studentScores.filter(x => x.totalScore <= myScore).length;
+            const percentile = totalAttended > 0 ? Number(((countEqualOrBelow / totalAttended) * 100).toFixed(2)) : 0;
 
             // Build detailed question analysis for this student
             const myAnsMap = new Map(mySession.answers.map(a => [a.questionId.toString(), a.selectedOption]));

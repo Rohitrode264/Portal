@@ -122,8 +122,8 @@ export class ExamService {
         for (let i = 0; i < attendedList.length; i++) {
             const item = attendedList[i];
             if (!scoreToRankAndPercentile.has(item.totalScore)) {
-                const countBelow = attendedList.filter(x => x.totalScore < item.totalScore).length;
-                const percentile = totalAttended > 0 ? Number(((countBelow / totalAttended) * 100).toFixed(2)) : 0;
+                const countEqualOrBelow = attendedList.filter(x => x.totalScore <= item.totalScore).length;
+                const percentile = totalAttended > 0 ? Number(((countEqualOrBelow / totalAttended) * 100).toFixed(2)) : 0;
                 scoreToRankAndPercentile.set(item.totalScore, {
                     rank: i + 1,
                     percentile
