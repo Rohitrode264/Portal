@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle, HelpCircle, Filter, Atom, FlaskConical, Calculator, Leaf } from 'lucide-react';
+import { Loader2, ArrowLeft, Trophy, CheckCircle2, XCircle, HelpCircle, Filter, Atom, FlaskConical, Calculator, Leaf, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { RichTextDisplay } from '../../components/RichTextDisplay';
 
 type DetailedQuestion = {
   _id: string;
@@ -55,11 +56,12 @@ const SUBJECT_ICON: Record<string, ReactNode> = {
 
 const OPTION_LETTERS = ['A', 'B', 'C', 'D'];
 
-export function StudentResultView() {
+export const StudentResultView = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<ResultData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [filterSubj, setFilterSubj] = useState<string>('ALL');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNATTEMPTED'>('ALL');
 
@@ -329,19 +331,21 @@ export function StudentResultView() {
                   </div>
 
                   {/* Question Text */}
-                  <p className="text-sm font-medium text-gray-900 leading-relaxed whitespace-pre-wrap mb-4">
-                    {q.text}
-                  </p>
+                  <div className="text-sm font-medium text-gray-900 leading-relaxed mb-4 overflow-hidden">
+                    <RichTextDisplay html={q.text} />
+                  </div>
 
                   {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
-                    <div className="mb-4 flex justify-center">
-                      <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white" />
+                    <div className="mb-4 flex justify-center cursor-pointer" onClick={() => setExpandedImage(q.diagramUrl || null)}>
+                      <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
                     </div>
                   )}
                   {q.diagramUrls && q.diagramUrls.length > 0 && (
-                    <div className="mb-4 flex flex-wrap gap-4 justify-center">
+                    <div className="mb-4 grid gap-4 grid-cols-1 sm:grid-cols-2">
                       {q.diagramUrls.map(url => (
-                        <img key={url} src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white" />
+                        <div key={url} className="flex justify-center cursor-pointer" onClick={() => setExpandedImage(url)}>
+                          <img src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
+                        </div>
                       ))}
                     </div>
                   )}
@@ -372,9 +376,9 @@ export function StudentResultView() {
                           key={letter}
                           className={`border rounded-xl p-3 flex items-start justify-between gap-2 text-xs transition-all ${optCls}`}
                         >
-                          <div className="flex items-start gap-2.5">
+                          <div className="flex items-start gap-2.5 min-w-0 flex-1">
                             <span className="font-mono font-bold shrink-0 mt-0.5">{letter}.</span>
-                            <span className="leading-relaxed">{opt || `Option ${letter}`}</span>
+                            <div className="leading-relaxed min-w-0 flex-1"><RichTextDisplay html={opt || `Option ${letter}`} /></div>
                           </div>
                           {badge && <div className="shrink-0">{badge}</div>}
                         </div>
@@ -387,6 +391,26 @@ export function StudentResultView() {
           )}
         </div>
       </div>
+      
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setExpandedImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 bg-black/50 rounded-full"
+            onClick={() => setExpandedImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={expandedImage} 
+            alt="Expanded view" 
+            className="max-w-full max-h-[90vh] object-contain bg-white rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </DashboardLayout>
   );
-}
+};

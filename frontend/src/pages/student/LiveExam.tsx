@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Loader2, AlertTriangle, Clock, CheckCircle2, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Loader2, AlertTriangle, Clock, CheckCircle2, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
+import { RichTextDisplay } from '../../components/RichTextDisplay';
 
 export function LiveExam() {
   const { id } = useParams<{ id: string }>();
@@ -12,6 +13,7 @@ export function LiveExam() {
   const [sessionData, setSessionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalStage, setApprovalStage] = useState<'waiting_coordinator' | 'verified_present'>('waiting_coordinator');
@@ -584,24 +586,26 @@ export function LiveExam() {
                       return (
                         <div key={q._id} className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/80 shadow-2xs hover:border-gray-300/80 transition-all">
                           <div className="flex justify-between items-start gap-4 mb-5">
-                            <p className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans">
-                              <span className="font-black text-blue-600 mr-2 font-mono">Q{i + 1}.</span> 
-                              {q.text}
-                            </p>
+                            <div className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed font-sans flex-1 overflow-hidden">
+                              <span className="font-black text-blue-600 mr-2 font-mono float-left mt-1">Q{i + 1}.</span> 
+                              <RichTextDisplay html={q.text} />
+                            </div>
                             <span className="shrink-0 text-[11px] font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/60 font-mono">
                               +{q.marks} / -{q.negativeMarks}
                             </span>
                           </div>
                           
                           {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
-                            <div className="mb-5 flex justify-center">
-                              <img src={q.diagramUrl} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white" />
+                            <div className="mb-6 flex justify-center cursor-pointer" onClick={() => setExpandedImage(q.diagramUrl)}>
+                              <img src={q.diagramUrl} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
                             </div>
                           )}
                           {q.diagramUrls && q.diagramUrls.length > 0 && (
-                            <div className="mb-5 flex flex-wrap gap-4 justify-center">
+                            <div className="mb-6 grid gap-4 grid-cols-1 sm:grid-cols-2">
                               {q.diagramUrls.map((url: string) => (
-                                <img key={url} src={url} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white" />
+                                <div key={url} className="flex justify-center cursor-pointer" onClick={() => setExpandedImage(url)}>
+                                  <img src={url} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
+                                </div>
                               ))}
                             </div>
                           )}
@@ -626,7 +630,7 @@ export function LiveExam() {
                                   }`}>
                                     {letter}
                                   </span>
-                                  <span className="text-xs sm:text-sm leading-snug whitespace-pre-wrap font-sans">{opt}</span>
+                                  <div className="text-xs sm:text-sm leading-snug font-sans text-left flex-1 min-w-0"><RichTextDisplay html={opt} /></div>
                                 </button>
                               );
                             })}
@@ -686,6 +690,26 @@ export function LiveExam() {
           })}
         </div>
       </div>
+      
+      {expandedImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setExpandedImage(null)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 bg-black/50 rounded-full"
+            onClick={() => setExpandedImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          <img 
+            src={expandedImage} 
+            alt="Expanded view" 
+            className="max-w-full max-h-[90vh] object-contain bg-white rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,8 @@ import {
   CheckCheck, Radio, Pencil, X, Save, Info, Trophy, ImagePlus
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { RichTextEditor } from '../../components/RichTextEditor';
+import { RichTextDisplay } from '../../components/RichTextDisplay';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Question = {
@@ -96,7 +98,6 @@ function QuestionForm({
   onCancel,
   submitLabel = 'Add Question',
   loading = false,
-  textRef,
   defaultMarks,
   defaultNegativeMarks,
 }: {
@@ -106,7 +107,6 @@ function QuestionForm({
   onCancel: () => void;
   submitLabel?: string;
   loading?: boolean;
-  textRef?: React.RefObject<HTMLTextAreaElement | null>;
   defaultMarks?: number;
   defaultNegativeMarks?: number;
 }) {
@@ -176,13 +176,11 @@ function QuestionForm({
         <label className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
           Question
         </label>
-        <textarea
-          ref={textRef}
-          rows={3}
+        <RichTextEditor
           value={value.text}
-          onChange={e => onChange({ ...value, text: e.target.value })}
+          onChange={val => onChange({ ...value, text: val })}
           placeholder="Write the question clearly. Include all necessary context the student needs."
-          className="w-full bg-gray-50 border border-gray-100 focus:border-gray-300 focus:bg-white rounded-xl px-4 py-3 outline-none text-sm font-medium text-gray-800 placeholder-gray-300 resize-none transition-colors leading-relaxed"
+          className="mb-2"
         />
 
         {/* Diagram Upload */}
@@ -277,13 +275,13 @@ function QuestionForm({
                 </span>
 
                 {/* Option text input */}
-                <input
-                  type="text"
-                  value={value.options[i]}
-                  onChange={e => setOption(i, e.target.value)}
-                  placeholder={`Option ${letter} — enter the answer choice`}
-                  className="flex-1 bg-transparent outline-none text-sm font-medium text-gray-700 placeholder-gray-300"
-                />
+                <div className="flex-1 min-w-0">
+                  <RichTextEditor
+                    value={value.options[i]}
+                    onChange={val => setOption(i, val)}
+                    placeholder={`Option ${letter} — enter the answer choice`}
+                  />
+                </div>
 
                 {/* Correct answer label */}
                 {isCorrect && (
@@ -1026,7 +1024,6 @@ export function ExamDetail() {
                       onCancel={() => { setAdding(false); setAddDraft(makeEmptyForm(activeSection.defaultMarks ?? exam?.defaultMarks, activeSection.defaultNegativeMarks ?? exam?.defaultNegativeMarks)); }}
                       submitLabel="Add Question"
                       loading={actionLoading === 'add'}
-                      textRef={addTextRef}
                       defaultMarks={activeSection.defaultMarks ?? exam.defaultMarks}
                       defaultNegativeMarks={activeSection.defaultNegativeMarks ?? exam.defaultNegativeMarks}
                     />
@@ -1061,9 +1058,9 @@ export function ExamDetail() {
                         onClick={() => { if (!isEditing) { setExpandedQ(isExpanded ? null : q._id); } }}
                       >
                         <span className="text-xs font-black text-gray-300 mt-0.5 w-6 shrink-0">Q{i + 1}</span>
-                        <p className={`flex-1 text-sm font-medium text-gray-800 leading-relaxed ${!isExpanded && !isEditing ? 'line-clamp-2' : ''}`}>
-                          {q.text}
-                        </p>
+                        <div className={`flex-1 text-sm font-medium text-gray-800 leading-relaxed ${!isExpanded && !isEditing ? 'line-clamp-2 overflow-hidden' : ''}`}>
+                          <RichTextDisplay html={q.text} />
+                        </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-0.5 rounded-md">
                             +{q.marks}/−{q.negativeMarks}
@@ -1136,7 +1133,7 @@ export function ExamDetail() {
                                   }`}
                                 >
                                   <span className={`font-black text-[11px] w-4 shrink-0 ${isCorrect ? 'text-emerald-600' : 'text-gray-300'}`}>{letter}</span>
-                                  <span className="font-medium flex-1">{opt}</span>
+                                  <div className="font-medium flex-1 min-w-0"><RichTextDisplay html={opt} /></div>
                                   {isCorrect && (
                                     <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-full shrink-0">✓ Correct</span>
                                   )}
