@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
-import { Loader2, ArrowLeft, Users, ShieldCheck } from 'lucide-react';
+import { Loader2, ArrowLeft, Users, ShieldCheck, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 type PortalSection = {
@@ -14,8 +14,10 @@ type PortalSection = {
 export function SectionStudentsPage() {
   const { classId, group, sectionName } = useParams<{ classId: string; group: string; sectionName: string }>();
   const [section, setSection] = useState<PortalSection | null>(null);
+  const [classMeta, setClassMeta] = useState<{ className: string; academicYear: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<any[]>([]);
+  const [exporting, setExporting] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export function SectionStudentsPage() {
       const sections = studentsRes.data.sections || [];
       const foundSection = sections.find((s: PortalSection) => s.sectionName === sectionName);
       setSection(foundSection || null);
+      setClassMeta({ className: studentsRes.data.className || 'Class', academicYear: studentsRes.data.academicYear || '' });
       setStaff(staffRes.data.staff || []);
     } catch {
       toast.error('Failed to load section data');
@@ -45,26 +48,62 @@ export function SectionStudentsPage() {
     ? staff.find(s => s.cpId === section.coordinatorCpId)?.name || section.coordinatorCpId
     : null;
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const response = await api.get(`/classes/${classId}/export?group=${group}&sectionName=${sectionName}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      let fileName = `${group}_Section_${sectionName}_Students.xlsx`;
+      if (classMeta) {
+        fileName = `${classMeta.className}_${classMeta.academicYear}_${group}_Sec_${sectionName}.xlsx`.replace(/ /g, '_');
+      }
+      link.setAttribute('download', fileName);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Export successful');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export section students');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => navigate(`/classes/${classId}/group/${group}`)}
-            className="p-2 -ml-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-              <span className="w-7 h-7 rounded bg-blue-100 text-blue-700 flex items-center justify-center text-[15px]">
-                {sectionName}
-              </span>
-              Section {sectionName} Roster
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">{group} Group</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(`/classes/${classId}/group/${group}`)}
+              className="p-2 -ml-2 rounded-lg text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <span className="w-7 h-7 rounded bg-blue-100 text-blue-700 flex items-center justify-center text-[15px]">
+                  {sectionName}
+                </span>
+                Section {sectionName} Roster
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">{group} Group</p>
+            </div>
           </div>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm disabled:opacity-50"
+          >
+            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Export Excel
+          </button>
         </div>
 
         {loading ? (

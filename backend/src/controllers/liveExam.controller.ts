@@ -6,6 +6,7 @@ import { Student } from "../models/Student.model";
 import { Enrollment } from "../models/Enrollment.model";
 import { Session } from "../models/Session.model";
 import { ClassConfig } from "../models/ClassConfig.model";
+import { sectionService } from "../services/section.service";
 
 export class LiveExamController {
   // --- TEACHER ACTIONS ---
@@ -14,8 +15,22 @@ export class LiveExamController {
   async markAttendance(req: Request, res: Response): Promise<void> {
     try {
       const { examId, studentCpId } = req.body;
+      const userCpId = (req as any).user.userId;
+      const userRole = (req as any).user.role;
+
       const examObj = await Exam.findById(examId);
-      const isLive = examObj && examObj.status === "LIVE";
+      if (!examObj) {
+        res.status(404).json({ error: "Exam not found" });
+        return;
+      }
+      
+      const allowedStudentCpIds = await sectionService.getAllowedStudentCpIds(examObj.classId, examObj.group as 'PCM' | 'PCB', userRole, userCpId);
+      if (allowedStudentCpIds !== null && !allowedStudentCpIds.includes(studentCpId)) {
+          res.status(403).json({ error: "Forbidden: You are not authorized to mark attendance for this student." });
+          return;
+      }
+
+      const isLive = examObj.status === "LIVE";
 
       const session = await ExamSession.findOne({ examId, studentCpId });
       
@@ -59,12 +74,26 @@ export class LiveExamController {
   async releaseAllPresent(req: Request, res: Response): Promise<void> {
     try {
       const { id } = req.params; // examId
+      const userCpId = (req as any).user.userId;
+      const userRole = (req as any).user.role;
       const now = new Date();
       const examObj = await Exam.findById(id);
+      if (!examObj) {
+        res.status(404).json({ error: "Exam not found" });
+        return;
+      }
+
+      const allowedStudentCpIds = await sectionService.getAllowedStudentCpIds(examObj.classId, examObj.group as 'PCM' | 'PCB', userRole, userCpId);
+      
+      const filter: any = { examId: id, status: "PRESENT" };
+      if (allowedStudentCpIds !== null) {
+          filter.studentCpId = { $in: allowedStudentCpIds };
+      }
+
       const liveStart = now;
 
       const result = await ExamSession.updateMany(
-        { examId: id, status: "PRESENT" },
+        filter,
         {
           status: "IN_PROGRESS",
           startedAt: now,
@@ -114,70 +143,28 @@ export class LiveExamController {
       }
 
       // Fetch class configuration to determine sections and access
-      const config = await ClassConfig.findOne({
-        classId: exam.classId,
-        group: exam.group,
-      });
-      const strength = config?.classStrength || 40;
-      const configSections = config?.sections || [];
+      const data = await sectionService.getSectionsData(exam.classId, exam.group as 'PCM' | 'PCB');
+      
+      const allowedStudents: any[] = [];
+      let isCoordinator = false;
 
-      // Determine which sections the current user coordinates
-      let allowedSections: string[] = [];
-      if (userRole === "ADMIN") {
-        // Admins see all sections
-        allowedSections = configSections.map((s) => s.sectionName);
-      } else if (userRole === "TEACHER") {
-        allowedSections = configSections
-          .filter((s) => s.coordinatorCpId === userCpId)
-          .map((s) => s.sectionName);
-
-        if (allowedSections.length === 0) {
-          res
-            .status(403)
-            .json({
-              error:
-                "Forbidden: You are not assigned as a coordinator for any sections of this exam.",
-            });
-          return;
-        }
+      for (const section of data.sections) {
+         if (userRole === "ADMIN" || section.coordinatorCpId === userCpId) {
+             allowedStudents.push(...section.students);
+             if (section.coordinatorCpId === userCpId) isCoordinator = true;
+         }
       }
 
-      // 1. Fetch ongoing enrollments in this class
-      const enrollments = await Enrollment.find({
-        academicClassId: exam.classId,
-        status: "ONGOING",
-      });
-
-      const studentIds = enrollments.map((e) => e.studentId);
-
-      // 2. Fetch eligible CET students
-      const allStudents = await Student.find({
-        _id: { $in: studentIds },
-        status: "ACTIVE",
-        cetBucket: exam.group,
-        whatsappNumber: { $exists: true, $nin: [null, ""] },
-      });
-
-      // 3. Sort students deterministically (by admissionNumber) for consistent section mapping
-      allStudents.sort((a, b) =>
-        a.admissionNumber.localeCompare(b.admissionNumber),
-      );
-
-      // 4. Partition students and filter based on allowed sections
-      const students = allStudents.filter((_, index) => {
-        const sectionName = String.fromCharCode(
-          65 + Math.floor(index / strength),
-        );
-        // If the teacher coordinates this section, or they are an Admin (where allowedSections might not cover dynamically created empty sections if config is missing, so we just allow them)
-        if (userRole === "ADMIN") return true;
-        return allowedSections.includes(sectionName);
-      });
+      if (userRole !== "ADMIN" && !isCoordinator) {
+          res.status(403).json({ error: "Forbidden: You are not assigned as a coordinator for any sections of this exam." });
+          return;
+      }
 
       // 5. Fetch existing exam sessions
       const sessions = await ExamSession.find({ examId: id });
 
       // 6. Map students to roster list
-      const roster = students.map((student) => {
+      const roster = allowedStudents.map((student) => {
         const session = sessions.find(
           (s) => s.studentCpId === student.admissionNumber,
         );

@@ -10,7 +10,7 @@ router.use(authenticate);
 router.post('/attendance', requireRole(['TEACHER', 'ADMIN', 'ASSISTANT']), (req, res) => liveExamController.markAttendance(req, res));
 router.get('/:id/status', requireRole(['TEACHER', 'ADMIN', 'ASSISTANT']), (req, res) => liveExamController.getLiveStatus(req, res));
 router.post('/:id/release-all', requireRole(['TEACHER', 'ADMIN', 'ASSISTANT']), (req, res) => liveExamController.releaseAllPresent(req, res));
-router.post('/:id/end-exam', requireRole(['TEACHER', 'ADMIN', 'ASSISTANT']), (req, res) => liveExamController.endExam(req, res));
+router.post('/:id/end-exam', requireRole(['ADMIN']), (req, res) => liveExamController.endExam(req, res));
 
 // --- Student Routes ---
 router.post('/:id/start', requireRole(['STUDENT']), (req, res) => liveExamController.startExam(req, res));

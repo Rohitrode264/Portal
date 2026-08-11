@@ -98,6 +98,7 @@ export function ExamsPage() {
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [className, setClassName] = useState<string>('');
   const [academicYear, setAcademicYear] = useState<string>('');
+  const [exportingSection, setExportingSection] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -153,6 +154,30 @@ export function ExamsPage() {
       fetchSections();
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to update config');
+    }
+  };
+
+  const handleExportSection = async (e: React.MouseEvent, sectionName: string) => {
+    e.stopPropagation();
+    setExportingSection(sectionName);
+    try {
+      const response = await api.get(`/classes/${classId}/export?group=${group}&sectionName=${sectionName}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const fileName = `${className}_${academicYear}_${group}_Sec_${sectionName}.xlsx`.replace(/ /g, '_');
+      link.setAttribute('download', fileName);
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success(`Exported Section ${sectionName}`);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export section');
+    } finally {
+      setExportingSection(null);
     }
   };
 
@@ -299,7 +324,22 @@ export function ExamsPage() {
                             <p style={{ color: 'var(--text-muted)' }} className="text-[12px]">{section.students.length} students</p>
                           </div>
                         </div>
-                        <Icon name="chevron_right" size={16} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-0.5 transition-transform" />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => handleExportSection(e, section.sectionName)}
+                            disabled={exportingSection === section.sectionName}
+                            title="Export Section Students"
+                            className="w-7 h-7 rounded-full flex items-center justify-center transition-colors border"
+                            style={{ background: 'var(--surface)', borderColor: 'var(--border)' }}
+                          >
+                            {exportingSection === section.sectionName ? (
+                              <div className="w-3 h-3 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin" />
+                            ) : (
+                              <Icon name="file_download" size={16} style={{ color: 'var(--text-muted)' }} />
+                            )}
+                          </button>
+                          <Icon name="chevron_right" size={16} style={{ color: 'var(--text-muted)' }} className="group-hover:translate-x-0.5 transition-transform" />
+                        </div>
                       </div>
 
                       <div className="p-4">

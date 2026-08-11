@@ -9,6 +9,7 @@ router.use(authenticate);
 // Accessible by Admin, Teachers and Assistants
 router.get('/', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => classController.getClasses(req, res));
 router.get('/:classId/students', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => classController.getClassStudents(req, res));
+router.get('/:classId/export', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => classController.exportClassExcel(req, res));
 
 // Admin only
 router.patch('/:classId/config', requireRole(['ADMIN']), (req, res) => classController.updateClassConfig(req, res));

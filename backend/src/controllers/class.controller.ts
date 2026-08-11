@@ -1,9 +1,11 @@
 import { Request, Response } from 'express';
+import * as ExcelJS from 'exceljs';
 import { AcademicClass } from '../models/AcademicClass.model';
 import { ClassTemplate } from '../models/ClassTemplate.model';
 import { ClassConfig } from '../models/ClassConfig.model';
 import { Student } from '../models/Student.model';
 import { Enrollment } from '../models/Enrollment.model';
+import { sectionService } from '../services/section.service';
 
 export class ClassController {
     
@@ -116,50 +118,20 @@ export class ClassController {
                 return;
             }
 
-            // 1. Fetch ongoing enrollments in this class
-            const enrollments = await Enrollment.find({
-                academicClassId: classId,
-                status: 'ONGOING'
-            });
-
-            const studentIds = enrollments.map(e => e.studentId);
-
-            // 2. Fetch eligible CET students belonging to the target bucket
-            const students = await Student.find({
-                _id: { $in: studentIds },
-                status: 'ACTIVE',
-                cetBucket: group as 'PCM' | 'PCB',
-                whatsappNumber: { $exists: true, $nin: [null, ''] }
-            });
-
-            // 3. Sort students deterministically (e.g., by admissionNumber)
-            students.sort((a, b) => a.admissionNumber.localeCompare(b.admissionNumber));
-
-            // 4. Partition based on ClassStrength
-            const config = await ClassConfig.findOne({ classId, group: group as 'PCM' | 'PCB' });
-            const strength = config?.classStrength || 40;
-            const configSections = config?.sections || [];
-
-            const partitionedSections: any[] = [];
+            const data = await sectionService.getSectionsData(classId as string, group as 'PCM' | 'PCB');
             
-            for (let i = 0; i < students.length; i += strength) {
-                const sectionName = String.fromCharCode(65 + Math.floor(i / strength)); // A, B, C...
-                const sectionStudents = students.slice(i, i + strength).map(student => ({
+            const partitionedSections = data.sections.map(sec => ({
+                sectionName: sec.sectionName,
+                coordinatorCpId: sec.coordinatorCpId,
+                students: sec.students.map(student => ({
                     id: student._id,
                     admissionNumber: student.admissionNumber,
                     name: `${student.firstName} ${student.lastName}`,
                     phone: student.phone,
                     whatsappNumber: student.whatsappNumber
-                }));
-
-                const coordinatorCpId = configSections.find(s => s.sectionName === sectionName)?.coordinatorCpId || null;
-
-                partitionedSections.push({
-                    sectionName,
-                    coordinatorCpId,
-                    students: sectionStudents
-                });
-            }
+                }))
+            }));
+            const strength = data.classStrength;
 
             const academicClass = await AcademicClass.findById(classId).populate('templateId');
             let className = 'Unknown Class';
@@ -180,6 +152,82 @@ export class ClassController {
         } catch (error: any) {
             console.error('getClassStudents error:', error);
             res.status(500).json({ error: 'Failed to fetch class students' });
+        }
+    }
+
+    async exportClassExcel(req: Request, res: Response): Promise<void> {
+        try {
+            const { classId } = req.params;
+
+            const academicClass = await AcademicClass.findById(classId).populate('templateId');
+            if (!academicClass) {
+                res.status(404).json({ error: 'Class not found' });
+                return;
+            }
+
+            let className = 'Class';
+            const template = academicClass.templateId as any;
+            if (template) {
+                className = `${template.grade}${template.stream ? `_${template.stream}` : ''}_${template.board}`;
+            }
+
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Admin Portal';
+            workbook.created = new Date();
+
+            const { group, sectionName } = req.query;
+
+            let groups: ('PCM' | 'PCB')[] = ['PCM', 'PCB'];
+            if (group === 'PCM' || group === 'PCB') {
+                groups = [group];
+            }
+
+            for (const grp of groups) {
+                const data = await sectionService.getSectionsData(classId as string, grp);
+                
+                let filteredSections = data.sections;
+                if (sectionName) {
+                    filteredSections = filteredSections.filter(s => s.sectionName === sectionName);
+                }
+                
+                if (filteredSections.length === 0) continue;
+
+                const worksheet = workbook.addWorksheet(
+                    sectionName ? `${grp} Sec ${sectionName}` : `${grp} Group`
+                );
+                worksheet.columns = [
+                    { header: 'Admission Number (CPID)', key: 'cpid', width: 25 },
+                    { header: 'Student Name', key: 'name', width: 30 },
+                    { header: 'WhatsApp', key: 'whatsapp', width: 15 }
+                ];
+
+                worksheet.getRow(1).font = { bold: true };
+                worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+
+                for (const section of filteredSections) {
+                    for (const student of section.students) {
+                        worksheet.addRow({
+                            cpid: student.admissionNumber,
+                            name: `${student.firstName} ${student.lastName}`,
+                            whatsapp: student.whatsappNumber || ''
+                        });
+                    }
+                }
+            }
+
+            if (workbook.worksheets.length === 0) {
+                workbook.addWorksheet('Empty');
+            }
+
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${className}_Students.xlsx"`);
+
+            await workbook.xlsx.write(res);
+            res.end();
+
+        } catch (error: any) {
+            console.error('exportClassExcel error:', error);
+            res.status(500).json({ error: 'Failed to export class excel' });
         }
     }
 }

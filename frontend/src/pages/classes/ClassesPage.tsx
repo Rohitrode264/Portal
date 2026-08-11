@@ -105,6 +105,7 @@ function GroupCard({ group, cfg, onClick }: GroupCardProps) {
 export function ClassesPage() {
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingClass, setExportingClass] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => { fetchClasses(); }, []);
@@ -117,6 +118,26 @@ export function ClassesPage() {
       toast.error('Failed to load classes');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExport = async (cls: AcademicClass) => {
+    setExportingClass(cls.id);
+    try {
+      const response = await api.get(`/classes/${cls.id}/export`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `${cls.name.replace(/ /g, '_')}_${cls.academicYear.replace(/ /g, '_')}_Students.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Export successful');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to export students');
+    } finally {
+      setExportingClass(null);
     }
   };
 
@@ -174,6 +195,33 @@ export function ClassesPage() {
                         </div>
                       </div>
                     </div>
+                    <button
+                      onClick={() => handleExport(cls)}
+                      disabled={exportingClass === cls.id}
+                      title="Export Students to Excel"
+                      className="w-8 h-8 rounded-full flex items-center justify-center transition-colors border"
+                      style={{ 
+                        background: 'var(--surface)', 
+                        borderColor: 'var(--border)', 
+                        opacity: exportingClass === cls.id ? 0.5 : 1 
+                      }}
+                      onMouseEnter={e => {
+                        if (exportingClass !== cls.id) {
+                          (e.currentTarget as HTMLElement).style.background = 'var(--surface-sub)';
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (exportingClass !== cls.id) {
+                          (e.currentTarget as HTMLElement).style.background = 'var(--surface)';
+                        }
+                      }}
+                    >
+                      {exportingClass === cls.id ? (
+                        <div className="w-4 h-4 border-2 border-[var(--text-muted)] border-t-transparent rounded-full animate-spin"></div>
+                      ) : (
+                        <Icon name="file_download" size={18} style={{ color: 'var(--text-muted)' }} />
+                      )}
+                    </button>
                   </div>
 
                   {/* Groups */}
