@@ -8,6 +8,7 @@ import { User } from '../models/User.model';
 import { ExamSession } from '../models/ExamSession.model';
 import { Student } from '../models/Student.model';
 import { Enrollment } from '../models/Enrollment.model';
+import { Session } from '../models/Session.model';
 import { deleteFromS3 } from './upload.controller';
 
 export class ExamController {
@@ -473,6 +474,40 @@ export class ExamController {
         }
     }
 
+    // 6b. Unlock Section (Admin Override)
+    async unlockSection(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, subject } = req.params;
+            const userRole = (req as any).user.role;
+
+            if (userRole !== 'ADMIN') {
+                res.status(403).json({ error: 'Only ADMINs can unlock a section' });
+                return;
+            }
+
+            const exam = await Exam.findById(id);
+            if (!exam || exam.status !== 'DRAFT') {
+                res.status(400).json({ error: 'Exam not found or not in DRAFT' });
+                return;
+            }
+
+            const section = exam.sections.find(s => s.subject === subject);
+            if (!section) {
+                res.status(404).json({ error: 'Section not found' });
+                return;
+            }
+
+            section.status = 'IN_PROGRESS';
+            section.approvedAt = undefined;
+            section.approvedBy = undefined;
+
+            await exam.save();
+            res.json({ message: `${subject} section unlocked`, section });
+        } catch (error: any) {
+            res.status(500).json({ error: 'Failed to unlock section' });
+        }
+    }
+
     // 7. Lock Exam
     async lockExam(req: Request, res: Response): Promise<void> {
         try {
@@ -496,6 +531,37 @@ export class ExamController {
             res.json({ message: 'Exam locked successfully', exam });
         } catch (error: any) {
             res.status(500).json({ error: 'Failed to lock exam' });
+        }
+    }
+
+    // 7b. Unlock Exam (Admin Override)
+    async unlockExam(req: Request, res: Response): Promise<void> {
+        try {
+            const { id } = req.params;
+            const userRole = (req as any).user.role;
+
+            if (userRole !== 'ADMIN') {
+                res.status(403).json({ error: 'Only ADMINs can unlock an exam' });
+                return;
+            }
+
+            const exam = await Exam.findById(id);
+
+            if (!exam) {
+                res.status(404).json({ error: 'Exam not found' });
+                return;
+            }
+
+            if (exam.status !== 'LOCKED' && exam.status !== 'PUBLISHED') {
+                res.status(400).json({ error: 'Can only unlock exams that are LOCKED or PUBLISHED' });
+                return;
+            }
+
+            exam.status = 'DRAFT';
+            await exam.save();
+            res.json({ message: 'Exam unlocked and reverted to DRAFT', exam });
+        } catch (error: any) {
+            res.status(500).json({ error: 'Failed to unlock exam' });
         }
     }
 
@@ -538,6 +604,7 @@ export class ExamController {
     async deleteExam(req: Request, res: Response): Promise<void> {
         try {
             const { id } = req.params;
+            const userRole = (req as any).user.role;
             const exam = await Exam.findById(id);
 
             if (!exam) {
@@ -545,7 +612,19 @@ export class ExamController {
                 return;
             }
 
-            // Check if any section has questions
+            // ADMIN Override: Hard Cascade Delete
+            if (userRole === 'ADMIN') {
+                // Wipe all student attempts
+                await ExamSession.deleteMany({ examId: id });
+                // Release active student locks bound to this exam
+                await Session.updateMany({ lockedExamId: id }, { isExamLocked: false, lockedExamId: null });
+                // Delete exam
+                await Exam.findByIdAndDelete(id);
+                res.json({ message: 'Exam and all associated records permanently deleted' });
+                return;
+            }
+
+            // Regular Guard (Teachers / Coordinators)
             const hasContent = exam.sections.some(s => s.questions.length > 0);
 
             if (hasContent) {
@@ -624,6 +703,155 @@ export class ExamController {
         } catch (error: any) {
             console.error('Publish Result Error:', error);
             res.status(500).json({ error: 'Failed to publish result' });
+        }
+    }
+
+    // 8. Get Importable Exams (exams that have questions in the given subject)
+    async getImportableExams(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, subject } = req.params;
+            const subjectFilter = subject as string;
+
+            // Find all exams that have at least 1 question in the requested subject, excluding the current exam
+            const exams = await Exam.find({
+                _id: { $ne: id },
+                status: { $ne: 'ARCHIVED' as any },
+                'sections.subject': subjectFilter as any,
+            }).sort({ createdAt: -1 });
+
+            // Filter to only exams that actually have questions in that subject section
+            const importableExams = exams
+                .map(exam => {
+                    const section = exam.sections.find(s => s.subject === subject);
+                    if (!section || section.questions.length === 0) return null;
+
+                    return {
+                        _id: exam._id,
+                        title: exam.title,
+                        className: exam.className,
+                        group: exam.group,
+                        status: exam.status,
+                        scheduledAt: exam.scheduledAt,
+                        createdAt: exam.createdAt,
+                        questionCount: section.questions.length,
+                        questions: section.questions.map(q => ({
+                            _id: q._id,
+                            text: q.text,
+                            marks: q.marks,
+                            negativeMarks: q.negativeMarks,
+                            difficulty: q.difficulty,
+                            correctAnswer: q.correctAnswer,
+                            options: q.options,
+                            diagramUrl: q.diagramUrl,
+                            diagramUrls: q.diagramUrls,
+                        })),
+                    };
+                })
+                .filter(Boolean);
+
+            res.json({ exams: importableExams });
+        } catch (error: any) {
+            console.error('Get Importable Exams Error:', error);
+            res.status(500).json({ error: 'Failed to fetch importable exams' });
+        }
+    }
+
+    // 9. Import Questions from Another Exam
+    async importQuestions(req: Request, res: Response): Promise<void> {
+        try {
+            const { id, subject } = req.params;
+            const { sourceExamId, questionIds } = req.body; // questionIds is optional — if omitted, import all
+            const userCpId = (req as any).user.userId;
+            const userRole = (req as any).user.role;
+
+            if (!sourceExamId) {
+                res.status(400).json({ error: 'sourceExamId is required' });
+                return;
+            }
+
+            // Validate target exam
+            const targetExam = await Exam.findById(id);
+            if (!targetExam) {
+                res.status(404).json({ error: 'Target exam not found' });
+                return;
+            }
+            if (targetExam.status !== 'DRAFT') {
+                res.status(400).json({ error: 'Can only import questions into a DRAFT exam' });
+                return;
+            }
+
+            const targetSection = targetExam.sections.find(s => s.subject === subject);
+            if (!targetSection) {
+                res.status(400).json({ error: `Section ${subject} not found in target exam` });
+                return;
+            }
+            if (targetSection.status === 'READY') {
+                res.status(400).json({ error: 'Cannot import into an approved section' });
+                return;
+            }
+
+            // Role checks for teachers
+            if (userRole === 'TEACHER') {
+                const teacher = await User.findOne({ cpId: userCpId });
+                if (teacher?.subject !== subject) {
+                    res.status(403).json({ error: `You can only import questions into the ${teacher?.subject} section` });
+                    return;
+                }
+            }
+
+            // Fetch source exam
+            const sourceExam = await Exam.findById(sourceExamId);
+            if (!sourceExam) {
+                res.status(404).json({ error: 'Source exam not found' });
+                return;
+            }
+
+            const sourceSection = sourceExam.sections.find(s => s.subject === subject);
+            if (!sourceSection || sourceSection.questions.length === 0) {
+                res.status(400).json({ error: `No questions found in ${subject} section of the source exam` });
+                return;
+            }
+
+            // Determine which questions to import
+            let questionsToImport = sourceSection.questions;
+            if (questionIds && Array.isArray(questionIds) && questionIds.length > 0) {
+                questionsToImport = sourceSection.questions.filter(
+                    q => q._id && questionIds.includes(q._id.toString())
+                );
+                if (questionsToImport.length === 0) {
+                    res.status(400).json({ error: 'None of the specified questions were found in the source exam' });
+                    return;
+                }
+            }
+
+            // Copy questions into target section
+            const importedQuestions = questionsToImport.map(q => ({
+                text: q.text,
+                options: [...q.options],
+                correctAnswer: q.correctAnswer,
+                marks: q.marks,
+                negativeMarks: q.negativeMarks,
+                difficulty: q.difficulty,
+                diagramUrl: q.diagramUrl,
+                diagramUrls: q.diagramUrls ? [...q.diagramUrls] : [],
+                enteredBy: userCpId,
+            }));
+
+            targetSection.questions.push(...importedQuestions as any[]);
+            if (targetSection.status === 'PENDING') {
+                targetSection.status = 'IN_PROGRESS';
+            }
+
+            await targetExam.save();
+
+            res.json({
+                message: `${importedQuestions.length} question(s) imported successfully`,
+                importedCount: importedQuestions.length,
+                section: targetSection,
+            });
+        } catch (error: any) {
+            console.error('Import Questions Error:', error);
+            res.status(500).json({ error: 'Failed to import questions' });
         }
     }
 }

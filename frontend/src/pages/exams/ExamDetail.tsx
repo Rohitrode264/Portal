@@ -4,14 +4,15 @@ import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  Loader2, ArrowLeft, Plus, CheckCircle2, Lock,
+  Loader2, ArrowLeft, Plus, CheckCircle2, Lock, Unlock,
   Trash2, Clock, Calendar, ChevronDown, ChevronUp,
   FlaskConical, Atom, Calculator, Leaf, Zap, AlertCircle,
-  CheckCheck, Radio, Pencil, X, Save, Info, Trophy, ImagePlus
+  CheckCheck, Radio, Pencil, X, Save, Info, Trophy, ImagePlus, Download
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { RichTextEditor } from '../../components/RichTextEditor';
 import { RichTextDisplay } from '../../components/RichTextDisplay';
+import { ImportQuestionsModal } from '../../components/ImportQuestionsModal';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Question = {
@@ -425,6 +426,7 @@ export function ExamDetail() {
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
   const addTextRef = useRef<HTMLTextAreaElement>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -605,6 +607,49 @@ export function ExamDetail() {
     }
   };
 
+  const [deleteStep, setDeleteStep] = useState(0);
+
+  const handleDeleteExam = async () => {
+    if (deleteStep < 3) {
+      setDeleteStep(prev => prev + 1);
+      return;
+    }
+    setActionLoading('delete');
+    try {
+      await api.delete(`/exams/${id}`);
+      toast.success('Exam permanently deleted');
+      navigate('/exams');
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to delete exam');
+      setDeleteStep(0);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnlockExam = async () => {
+    setActionLoading('unlock');
+    try {
+      await api.patch(`/exams/${id}/unlock`);
+      toast.success('Exam unlocked');
+      fetchExam();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to unlock exam');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleUnlockSection = async (subject: string) => {
+    try {
+      await api.patch(`/exams/${id}/sections/${subject}/unlock`);
+      toast.success(`${subject} section unlocked`);
+      fetchExam();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to unlock section');
+    }
+  };
+
   const handleUpdateSectionMeta = async (subject: string, updates: { defaultMarks?: number; defaultNegativeMarks?: number }) => {
     try {
       await api.patch(`/exams/${id}/sections/${subject}`, updates);
@@ -680,6 +725,39 @@ export function ExamDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {user?.role === 'ADMIN' && (
+              <div className="flex items-center gap-2 border-r border-gray-200 pr-2 mr-1">
+                {(exam.status === 'LOCKED' || exam.status === 'PUBLISHED') && (
+                  <button
+                    onClick={handleUnlockExam}
+                    disabled={actionLoading === 'unlock'}
+                    className="flex items-center gap-1.5 bg-orange-50 text-orange-600 px-3 py-1.5 rounded-lg font-semibold text-xs hover:bg-orange-100 transition-all border border-orange-200"
+                  >
+                    {actionLoading === 'unlock' ? <Loader2 size={13} className="animate-spin" /> : <Unlock size={13} />}
+                    Unlock Exam
+                  </button>
+                )}
+                
+                <button
+                  onClick={handleDeleteExam}
+                  disabled={actionLoading === 'delete'}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs transition-all border ${
+                    deleteStep === 0 ? 'bg-white text-red-600 border-red-200 hover:bg-red-50' :
+                    deleteStep === 1 ? 'bg-red-50 text-red-600 border-red-300' :
+                    deleteStep === 2 ? 'bg-red-100 text-red-700 border-red-400' :
+                    'bg-red-600 text-white border-red-600 animate-pulse'
+                  }`}
+                  onMouseLeave={() => setDeleteStep(0)}
+                >
+                  {actionLoading === 'delete' ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                  {deleteStep === 0 ? 'Delete Exam' :
+                   deleteStep === 1 ? 'Click to confirm' :
+                   deleteStep === 2 ? 'Wipes data. Confirm?' :
+                   'Final: Delete permanently'}
+                </button>
+              </div>
+            )}
+            
             {(exam.status === 'LIVE' || exam.status === 'PUBLISHED') && exam.canMonitor && (
               <button
                 onClick={() => navigate(`/exams/${exam._id}/monitor`)}
@@ -946,11 +1024,21 @@ export function ExamDetail() {
 
             {/* Approved banner */}
             {activeSection.status === 'READY' && (
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 flex items-center gap-2.5">
-                <CheckCircle2 size={16} className="text-emerald-500" />
-                <span className="text-sm font-semibold text-emerald-700">
-                  {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} section approved — {activeSection.questions.length} questions locked in.
-                </span>
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-500" />
+                  <span className="text-sm font-semibold text-emerald-700">
+                    {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} section approved — {activeSection.questions.length} questions locked in.
+                  </span>
+                </div>
+                {user?.role === 'ADMIN' && (
+                  <button
+                    onClick={() => handleUnlockSection(activeSection.subject)}
+                    className="flex items-center gap-1.5 bg-white text-emerald-700 px-3 py-1.5 rounded-lg font-semibold text-xs border border-emerald-200 hover:bg-emerald-100 transition-all shrink-0"
+                  >
+                    <Unlock size={13} /> Unlock
+                  </button>
+                )}
               </div>
             )}
 
@@ -989,47 +1077,68 @@ export function ExamDetail() {
               </div>
             )}
 
-            {/* ── Add Question Card ─────────────────────────────────────────── */}
+            {/* ── Add / Import Question Cards ─────────────────────────────────── */}
             {canEdit && activeSection.status !== 'READY' && (
-              <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-                {!adding ? (
-                  <button
-                    onClick={() => { setAdding(true); setEditingQId(null); }}
-                    className="w-full flex items-center gap-3 p-5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-all">
-                      <Plus size={16} />
-                    </div>
-                    <div className="text-left">
-                      <span className="font-semibold text-sm block">Add a question</span>
-                      <span className="text-xs text-gray-400">
-                        {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} · {activeSection.questions.length} added so far
-                      </span>
-                    </div>
-                  </button>
-                ) : (
-                  <div className="p-5">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <span className="text-sm font-bold text-gray-900">New Question</span>
-                        <span className="text-xs text-gray-400 font-medium ml-2">
-                          {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} · #{activeSection.questions.length + 1}
+              <>
+                {/* Action Buttons Row */}
+                {!adding && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setAdding(true); setEditingQId(null); }}
+                      className="flex-1 bg-white rounded-2xl border border-gray-100 overflow-hidden flex items-center gap-3 p-5 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-all group"
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-all">
+                        <Plus size={16} />
+                      </div>
+                      <div className="text-left">
+                        <span className="font-semibold text-sm block">Add a question</span>
+                        <span className="text-xs text-gray-400">
+                          {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} · {activeSection.questions.length} added so far
                         </span>
                       </div>
-                    </div>
-                    <QuestionForm
-                      value={addDraft}
-                      onChange={setAddDraft}
-                      onSubmit={handleAddQuestion}
-                      onCancel={() => { setAdding(false); setAddDraft(makeEmptyForm(activeSection.defaultMarks ?? exam?.defaultMarks, activeSection.defaultNegativeMarks ?? exam?.defaultNegativeMarks)); }}
-                      submitLabel="Add Question"
-                      loading={actionLoading === 'add'}
-                      defaultMarks={activeSection.defaultMarks ?? exam.defaultMarks}
-                      defaultNegativeMarks={activeSection.defaultNegativeMarks ?? exam.defaultNegativeMarks}
-                    />
+                    </button>
+                    <button
+                      onClick={() => setShowImportModal(true)}
+                      className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex items-center gap-3 px-5 py-4 hover:border-indigo-200 hover:bg-indigo-50/30 transition-all group"
+                      style={{ minWidth: 180 }}
+                    >
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center transition-all">
+                        <Download size={15} className="text-indigo-500" />
+                      </div>
+                      <div className="text-left">
+                        <span className="font-semibold text-sm block text-indigo-600">Import</span>
+                        <span className="text-xs text-gray-400">From other exams</span>
+                      </div>
+                    </button>
                   </div>
                 )}
-              </div>
+
+                {/* Add Question Form (expanded) */}
+                {adding && (
+                  <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+                    <div className="p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <span className="text-sm font-bold text-gray-900">New Question</span>
+                          <span className="text-xs text-gray-400 font-medium ml-2">
+                            {activeSection.subject.charAt(0) + activeSection.subject.slice(1).toLowerCase()} · #{activeSection.questions.length + 1}
+                          </span>
+                        </div>
+                      </div>
+                      <QuestionForm
+                        value={addDraft}
+                        onChange={setAddDraft}
+                        onSubmit={handleAddQuestion}
+                        onCancel={() => { setAdding(false); setAddDraft(makeEmptyForm(activeSection.defaultMarks ?? exam?.defaultMarks, activeSection.defaultNegativeMarks ?? exam?.defaultNegativeMarks)); }}
+                        submitLabel="Add Question"
+                        loading={actionLoading === 'add'}
+                        defaultMarks={activeSection.defaultMarks ?? exam.defaultMarks}
+                        defaultNegativeMarks={activeSection.defaultNegativeMarks ?? exam.defaultNegativeMarks}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* ── Questions List ───────────────────────────────────────────── */}
@@ -1193,6 +1302,15 @@ export function ExamDetail() {
         )}
 
       </div>
+
+      {/* Import Questions Modal */}
+      <ImportQuestionsModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        examId={id!}
+        subject={activeTab}
+        onImported={fetchExam}
+      />
     </DashboardLayout>
   );
 }

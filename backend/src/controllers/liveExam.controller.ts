@@ -283,13 +283,41 @@ export class LiveExamController {
         }
       }
 
-      // Strip correct answers before sending
+      // Strip correct answers and shuffle questions per student
       const sanitizedExam: any = exam.toObject();
       sanitizedExam.remainingSeconds = remainingSeconds;
+      
+      // Deterministic PRNG helpers
+      const getStringSeed = (str: string) => {
+        let h = 0;
+        for(let i = 0; i < str.length; i++) {
+          h = Math.imul(31, h) + str.charCodeAt(i) | 0;
+        }
+        return h;
+      };
+      const seededRandom = (seed: number) => {
+        return function() {
+          seed |= 0; seed = seed + 0x9e3779b9 | 0;
+          let t = seed ^ seed >>> 16; t = Math.imul(t, 0x21f0aaad);
+          t = t ^ t >>> 15; t = Math.imul(t, 0x735a2d97);
+          return ((t = t ^ t >>> 15) >>> 0) / 4294967296;
+        }
+      };
+
       sanitizedExam.sections.forEach((sec: any) => {
         sec.questions.forEach((q: any) => {
           delete q.correctAnswer;
         });
+
+        // Shuffle deterministically based on student ID + exam ID + section
+        const seedStr = `${userCpId}_${exam._id.toString()}_${sec.subject}`;
+        const random = seededRandom(getStringSeed(seedStr));
+        for (let i = sec.questions.length - 1; i > 0; i--) {
+          const j = Math.floor(random() * (i + 1));
+          const temp = sec.questions[i];
+          sec.questions[i] = sec.questions[j];
+          sec.questions[j] = temp;
+        }
       });
 
       res.json({
