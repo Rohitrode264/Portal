@@ -724,9 +724,9 @@ export function ExamDetail() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {user?.role === 'ADMIN' && (
-              <div className="flex items-center gap-2 border-r border-gray-200 pr-2 mr-1">
+              <div className="flex items-center gap-2 border-r border-gray-200 pr-2 mr-1 flex-wrap">
                 {(exam.status === 'LOCKED' || exam.status === 'PUBLISHED') && (
                   <button
                     onClick={handleUnlockExam}
@@ -761,9 +761,9 @@ export function ExamDetail() {
             {(exam.status === 'LIVE' || exam.status === 'PUBLISHED') && exam.canMonitor && (
               <button
                 onClick={() => navigate(`/exams/${exam._id}/monitor`)}
-                className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all"
+                className="flex items-center gap-1.5 bg-black text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-gray-800 transition-all animate-pulse shadow-[0_0_12px_rgba(0,0,0,0.5)] border-2 border-red-500"
               >
-                <Zap size={13} /> Monitor
+                <Zap size={13} className="text-red-500" /> Monitor
               </button>
             )}
             {exam.status === 'COMPLETED' && (

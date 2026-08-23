@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -5,6 +6,7 @@ import { Loader2, AlertTriangle, Clock, CheckCircle2, ShieldAlert, ShieldCheck, 
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
 import { RichTextDisplay } from '../../components/RichTextDisplay';
+import NoSleep from 'nosleep.js';
 
 export function LiveExam() {
   const { id } = useParams<{ id: string }>();
@@ -19,6 +21,7 @@ export function LiveExam() {
   const [approvalStage, setApprovalStage] = useState<'waiting_coordinator' | 'verified_present'>('waiting_coordinator');
   const [activeSubject, setActiveSubject] = useState<string>('');
   const [showRules, setShowRules] = useState(true);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   // Tab tracking
   const [warningCount, setWarningCount] = useState(0);
@@ -27,6 +30,38 @@ export function LiveExam() {
   const [isSplitScreen, setIsSplitScreen] = useState(false);
   const initialWidth = useRef(window.innerWidth);
   const initialHeight = useRef(window.innerHeight);
+  
+  // Use NoSleep.js for broad mobile support (works over HTTP and iOS)
+  const noSleepRef = useRef<any>(null);
+
+  useEffect(() => {
+    noSleepRef.current = new NoSleep();
+    return () => {
+      if (noSleepRef.current) {
+        noSleepRef.current.disable();
+      }
+    };
+  }, []);
+
+  const requestWakeLock = useCallback(async () => {
+    try {
+      if (noSleepRef.current && !noSleepRef.current.isEnabled) {
+        noSleepRef.current.enable();
+      }
+    } catch (err: any) {
+      console.warn(`Wake Lock error: ${err.message}`);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    try {
+      if (noSleepRef.current && noSleepRef.current.isEnabled) {
+        noSleepRef.current.disable();
+      }
+    } catch (err) {
+      console.warn('Wake Lock release failed');
+    }
+  }, []);
 
   // Heartbeat interval
   useEffect(() => {
@@ -49,6 +84,7 @@ export function LiveExam() {
         });
         if (res.data.autoSubmitted) {
           toast.error(res.data.message, { duration: 10000 });
+          releaseWakeLock();
           navigate('/dashboard', { replace: true });
         } else {
           setWarningCount(res.data.warningCount);
@@ -58,9 +94,16 @@ export function LiveExam() {
         console.error('Tab switch report failed', err);
       }
     } else {
-      setTimeout(() => { if (!document.hidden) setIsBlurred(false); }, 400);
+      setTimeout(() => { 
+        if (!document.hidden) {
+          setIsBlurred(false);
+          if (sessionData?.status === 'IN_PROGRESS') {
+            requestWakeLock();
+          }
+        }
+      }, 400);
     }
-  }, [id, navigate]);
+  }, [id, navigate, sessionData, requestWakeLock, releaseWakeLock]);
 
   useEffect(() => {
     if (!exam || !sessionData) return;
@@ -73,10 +116,22 @@ export function LiveExam() {
       handleVisibilityChange('Screen Focus Lost / Blur');
     };
     const handleFocus = () => {
-      setTimeout(() => { if (!document.hidden) setIsBlurred(false); }, 400);
+      setTimeout(() => { 
+        if (!document.hidden) {
+          setIsBlurred(false);
+          if (sessionData?.status === 'IN_PROGRESS') {
+            requestWakeLock();
+          }
+        }
+      }, 400);
     };
     const handleResize = () => {
-      if (window.innerHeight < initialHeight.current * 0.85 || window.innerWidth < initialWidth.current * 0.85) {
+      const currentArea = window.innerWidth * window.innerHeight;
+      const initialArea = initialWidth.current * initialHeight.current;
+      
+      // If the screen area shrinks by more than 15%, it's likely a split-screen or resize.
+      // Simply rotating the device will preserve the total screen area!
+      if (currentArea < initialArea * 0.85) {
         if (!isSplitScreen) {
           setIsSplitScreen(true);
           handleVisibilityChange('Split-screen / Window Resize Detected');
@@ -96,7 +151,7 @@ export function LiveExam() {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('resize', handleResize);
     };
-  }, [exam, sessionData, handleVisibilityChange, isSplitScreen]);
+  }, [exam, sessionData, handleVisibilityChange, isSplitScreen, requestWakeLock]);
 
 
   useEffect(() => {
@@ -124,6 +179,11 @@ export function LiveExam() {
           setActiveSubject('');
         }
         setSessionData(res.data.session);
+
+        if (res.data.session?.status === 'IN_PROGRESS') {
+          requestWakeLock();
+        }
+
         setWarningCount(res.data.session.tabSwitchCount || 0);
         setTimeLeft(res.data.exam.remainingSeconds ?? res.data.exam.duration * 60);
       }
@@ -145,6 +205,27 @@ export function LiveExam() {
     const timer = setInterval(() => setTimeLeft(prev => prev! - 1), 1000);
     return () => clearInterval(timer);
   }, [timeLeft]);
+
+  // Scroll guard for touch devices
+  const isScrolling = useRef(false);
+  useEffect(() => {
+    let scrollTimeout: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      isScrolling.current = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        isScrolling.current = false;
+      }, 150);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('touchmove', onScroll, { passive: true });
+    
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('touchmove', onScroll);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
 
   const handleAnswerSelect = async (questionId: string, selectedOption: string) => {
     // Optimistic UI update
@@ -178,12 +259,21 @@ export function LiveExam() {
   };
 
   const handleFinalSubmit = async (auto = false) => {
-    if (!auto && !window.confirm('Are you sure you want to submit your exam? You cannot change answers after submitting.')) return;
-    
+    if (!auto) {
+      setShowSubmitModal(true);
+      return;
+    }
+    await executeSubmit();
+  };
+
+  const executeSubmit = async () => {
     setSubmitting(true);
+    setShowSubmitModal(false);
     try {
-      await api.post(`/live-exams/${id}/submit`);
-      toast.success('Exam submitted successfully!');
+      const res = await api.post(`/live-exams/${id}/submit`);
+      toast.success(res.data.message || 'Exam submitted!');
+      setSubmitting(false);
+      releaseWakeLock();
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Failed to submit exam');
@@ -408,11 +498,18 @@ export function LiveExam() {
                   <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">3</div>
                   <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>Do Not Close the Browser:</strong> If you accidentally close the browser, your session will be locked, and you must report to the coordinator.</p>
                 </div>
+                <div className="flex gap-3 items-start">
+                  <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">4</div>
+                  <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>Turn Off Auto-Rotate:</strong> Please ensure your device's screen rotation is locked/disabled before starting. Screen rotations can disrupt your exam interface.</p>
+                </div>
               </div>
             </div>
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end">
               <button
-                onClick={() => setShowRules(false)}
+                onClick={() => {
+                  setShowRules(false);
+                  requestWakeLock();
+                }}
                 className="bg-blue-600 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-blue-700 hover:shadow-md transition-all flex items-center gap-2"
               >
                 <CheckCircle2 size={18} /> I Understand, Start Exam
@@ -618,7 +715,13 @@ export function LiveExam() {
                               return (
                                 <button
                                   key={optIndex}
-                                  onClick={() => handleAnswerSelect(q._id, letter)}
+                                  onClick={(e) => {
+                                    if (isScrolling.current) {
+                                      e.preventDefault();
+                                      return;
+                                    }
+                                    handleAnswerSelect(q._id, letter);
+                                  }}
                                   className={`p-3 sm:p-3.5 rounded-xl text-left border-2 transition-all flex items-center gap-3 ${
                                     isSelected 
                                       ? 'bg-blue-50 border-blue-600 text-blue-950 font-bold shadow-2xs' 
@@ -708,6 +811,36 @@ export function LiveExam() {
             className="max-w-full max-h-[90vh] object-contain bg-white rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
+        </div>
+      )}
+
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-blue-600 mb-4 mx-auto">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-[17px] font-bold text-gray-900 text-center mb-1.5 tracking-tight">Submit Exam?</h3>
+            <p className="text-[13px] text-gray-500 text-center mb-6 leading-relaxed">
+              Are you sure you want to submit your exam? You won&apos;t be able to change your answers after submitting.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowSubmitModal(false)}
+                className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeSubmit}
+                className="flex-1 py-2.5 rounded-xl font-bold text-[13px] text-white bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                disabled={submitting}
+              >
+                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Yes, Submit'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

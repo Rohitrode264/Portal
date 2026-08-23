@@ -28,8 +28,8 @@ export class ExamService {
         for (const sec of exam.sections) {
             for (const q of sec.questions) {
                 if (q._id) {
-                    const m = q.marks || exam.defaultMarks || 4;
-                    const nm = q.negativeMarks || exam.defaultNegativeMarks || 1;
+                    const m = q.marks ?? sec.defaultMarks ?? exam.defaultMarks ?? 4;
+                    const nm = q.negativeMarks ?? sec.defaultNegativeMarks ?? exam.defaultNegativeMarks ?? 1;
                     questionMap.set(q._id.toString(), {
                         subject: sec.subject,
                         correctAnswer: q.correctAnswer,

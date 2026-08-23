@@ -69,7 +69,10 @@ export function StudentSearchPage() {
   }, []);
 
   useEffect(() => {
-    if (!query.trim()) { setResults([]); setHasSearched(false); return; }
+    if (!query.trim()) { 
+      // Do nothing, state is already reset in the onChange handler
+      return; 
+    }
     const timer = setTimeout(() => fetchStudents(query), 300);
     return () => clearTimeout(timer);
   }, [query, fetchStudents]);
@@ -110,7 +113,14 @@ export function StudentSearchPage() {
               type="text"
               placeholder="Search by name or admission number…"
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => {
+                const val = e.target.value;
+                setQuery(val);
+                if (!val.trim()) {
+                  setResults([]);
+                  setHasSearched(false);
+                }
+              }}
               autoFocus
               style={{
                 background: 'transparent',

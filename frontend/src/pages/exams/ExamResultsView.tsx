@@ -71,6 +71,8 @@ export function ExamResultsView() {
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [filterSubj, setFilterSubj] = useState<string>('ALL');
+  const [filterSort, setFilterSort] = useState<string>('highest');
+  const [filterAttendance, setFilterAttendance] = useState<string>('ALL');
 
   useEffect(() => { fetchResults(); }, [id]);
 
@@ -111,6 +113,17 @@ export function ExamResultsView() {
 
   const { exam, summary, roster } = data;
   const subjects = ['PHYSICS', 'CHEMISTRY', exam.group === 'PCM' ? 'MATHS' : 'BIOLOGY'];
+
+  const processedRoster = [...roster].filter(r => {
+    if (filterAttendance === 'PRESENT') return r.attended;
+    if (filterAttendance === 'ABSENT') return !r.attended;
+    return true;
+  }).sort((a, b) => {
+    if (filterSort === 'highest') return b.totalScore - a.totalScore;
+    if (filterSort === 'lowest') return a.totalScore - b.totalScore;
+    if (filterSort === 'name') return a.name.localeCompare(b.name);
+    return 0;
+  });
 
   return (
     <DashboardLayout>
@@ -178,24 +191,45 @@ export function ExamResultsView() {
           />
         </div>
 
-        {/* Subject Filter Tabs */}
-        <div className="bg-white border border-gray-100 rounded-xl p-1.5 flex items-center gap-1 overflow-x-auto shadow-sm">
-          {['ALL', ...subjects].map(subj => (
+        {/* Action Bar (Filters & Sorting) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+          <div className="flex flex-wrap items-center gap-2 p-1 bg-white border border-gray-100 rounded-lg shadow-sm">
             <button
-              key={subj}
-              onClick={() => setFilterSubj(subj)}
-              className={[
-                'px-3 py-1.5 rounded-lg text-[12px] font-semibold whitespace-nowrap transition-all',
-                filterSubj === subj
-                  ? 'bg-gray-900 text-white'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800',
-              ].join(' ')}
+              onClick={() => setFilterSubj('ALL')}
+              className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors ${filterSubj === 'ALL' ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}
             >
-              {subj === 'ALL' ? 'Overall' : subj.charAt(0) + subj.slice(1).toLowerCase()}
+              Overall
             </button>
-          ))}
-          <div className="ml-auto pl-3 shrink-0">
-            <span className="text-[12px] text-gray-400 font-mono">{roster.length} students</span>
+            {subjects.map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterSubj(s)}
+                className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors ${filterSubj === s ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}
+              >
+                {s.charAt(0) + s.slice(1).toLowerCase()}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={filterAttendance}
+              onChange={e => setFilterAttendance(e.target.value)}
+              className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:border-blue-300"
+            >
+              <option value="ALL">All Students</option>
+              <option value="PRESENT">Present Only</option>
+              <option value="ABSENT">Absent Only</option>
+            </select>
+            <select
+              value={filterSort}
+              onChange={e => setFilterSort(e.target.value)}
+              className="text-[12px] border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 font-medium focus:outline-none focus:border-blue-300"
+            >
+              <option value="highest">Sort: Highest Marks</option>
+              <option value="lowest">Sort: Lowest Marks</option>
+              <option value="name">Sort: Name (A-Z)</option>
+            </select>
           </div>
         </div>
 
@@ -222,7 +256,7 @@ export function ExamResultsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {roster.map((r) => {
+                {processedRoster.map((r) => {
                   const subjData = filterSubj === 'ALL' ? null : r.subjectScores[filterSubj];
                   const score = filterSubj === 'ALL' ? r.totalScore : (subjData?.score ?? 0);
                   const correct = filterSubj === 'ALL' ? r.correctCount : (subjData?.correct ?? 0);

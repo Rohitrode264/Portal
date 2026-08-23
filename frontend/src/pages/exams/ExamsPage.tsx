@@ -212,7 +212,7 @@ export function ExamsPage() {
             </div>
           </div>
           {canCreate && activeTab === 'exams' && (
-            <Button variant="primary" size="md" onClick={() => navigate('/exams/create')}>
+            <Button variant="primary" size="md" onClick={() => navigate(`/exams/create${classId && group ? `?classId=${classId}&group=${group}` : ''}`)}>
               <Icon name="add" size={16} />
               New Exam
             </Button>
@@ -380,7 +380,7 @@ export function ExamsPage() {
           loading ? (
             <LoadingSpinner fullPage />
           ) : exams.length === 0 ? (
-            <EmptyExams canCreate={canCreate} onCreateClick={() => navigate('/exams/create')} />
+            <EmptyExams canCreate={canCreate} onCreateClick={() => navigate(`/exams/create${classId && group ? `?classId=${classId}&group=${group}` : ''}`)} />
           ) : (
             <div className="card overflow-hidden stagger" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
               {/* Fix: Added horizontal scroll wrapper */}

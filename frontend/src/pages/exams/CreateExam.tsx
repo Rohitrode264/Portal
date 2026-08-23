@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Loader2, ArrowLeft, Clock, Calendar, Users, ChevronRight,
   BookOpen, Info, Plus, Minus, AlertTriangle
@@ -25,6 +25,10 @@ const DURATION_PRESETS = [
 
 export function CreateExam() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initClassId = searchParams.get('classId');
+  const initGroup = searchParams.get('group');
+
   const [classes, setClasses] = useState<AcademicClass[]>([]);
   const [staff, setStaff] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,8 +36,8 @@ export function CreateExam() {
 
   const [form, setForm] = useState({
     title: '',
-    classId: '',
-    group: 'PCM' as 'PCM' | 'PCB',
+    classIds: initClassId ? [initClassId] : ([] as string[]),
+    groups: initGroup ? [initGroup] : (['PCM'] as string[]),
     duration: 180,
     scheduledAt: '',
     loginWindowMinutes: 15,
@@ -49,29 +53,60 @@ export function CreateExam() {
     ])
       .then(([classesRes, staffRes]) => {
         setClasses(classesRes.data.classes);
-        if (classesRes.data.classes.length > 0) {
-          setForm(p => ({ ...p, classId: classesRes.data.classes[0].id }));
+        if (classesRes.data.classes.length > 0 && !initClassId) {
+          setForm(p => ({ ...p, classIds: [classesRes.data.classes[0].id] }));
         }
         setStaff(staffRes.data.staff || []);
       })
       .catch(() => toast.error('Failed to load initial data'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [initClassId]);
 
   const set = (key: keyof typeof form, value: any) => setForm(p => ({ ...p, [key]: value }));
 
+  const toggleClass = (id: string) => {
+    setForm(p => ({
+      ...p,
+      classIds: p.classIds.includes(id) ? p.classIds.filter(c => c !== id) : [...p.classIds, id]
+    }));
+  };
+
+  const toggleGroup = (g: string) => {
+    setForm(p => ({
+      ...p,
+      groups: p.groups.includes(g) ? p.groups.filter(grp => grp !== g) : [...p.groups, g]
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.classId) { toast.error('Please select a class'); return; }
+    if (form.classIds.length === 0) { toast.error('Please select at least one class'); return; }
+    if (form.groups.length === 0) { toast.error('Please select at least one group'); return; }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
-      };
-      const res = await api.post('/exams', payload);
-      toast.success('Exam created!');
-      navigate(`/exams/${res.data.exam._id}`);
+      const createdExams = [];
+      for (const cid of form.classIds) {
+        for (const g of form.groups) {
+          const payload = {
+            ...form,
+            classId: cid,
+            group: g,
+            scheduledAt: form.scheduledAt ? new Date(form.scheduledAt).toISOString() : undefined,
+          };
+          const res = await api.post('/exams', payload);
+          createdExams.push(res.data.exam);
+        }
+      }
+      toast.success(`${createdExams.length} Exam(s) created!`);
+      if (createdExams.length === 1) {
+        navigate(`/exams/${createdExams[0]._id}`);
+      } else {
+        if (initClassId && initGroup) {
+          navigate(`/classes/${initClassId}/group/${initGroup}`);
+        } else {
+          navigate(`/exams`);
+        }
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to create exam');
     } finally {
@@ -142,22 +177,22 @@ export function CreateExam() {
                     <button
                       key={cls.id}
                       type="button"
-                      onClick={() => set('classId', cls.id)}
+                      onClick={() => toggleClass(cls.id)}
                       className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all ${
-                        form.classId === cls.id
+                        form.classIds.includes(cls.id)
                           ? 'bg-gray-900 border-gray-900 text-white'
                           : 'bg-gray-50 border-gray-100 text-gray-700 hover:border-gray-200'
                       }`}
                     >
                       <div>
                         <span className="font-semibold text-sm">{cls.name}</span>
-                        <span className={`block text-xs mt-0.5 ${form.classId === cls.id ? 'text-gray-400' : 'text-gray-400'}`}>
+                        <span className={`block text-xs mt-0.5 ${form.classIds.includes(cls.id) ? 'text-gray-400' : 'text-gray-400'}`}>
                           AY {cls.academicYear}
                         </span>
                       </div>
-                      {form.classId === cls.id && (
-                        <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center">
-                          <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                      {form.classIds.includes(cls.id) && (
+                        <div className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                          <div className="w-2.5 h-2.5 bg-white rounded-sm" />
                         </div>
                       )}
                     </button>
@@ -175,15 +210,15 @@ export function CreateExam() {
                   <button
                     key={g}
                     type="button"
-                    onClick={() => set('group', g)}
+                    onClick={() => toggleGroup(g)}
                     className={`py-3 rounded-xl font-bold text-sm transition-all border ${
-                      form.group === g
+                      form.groups.includes(g)
                         ? 'bg-gray-900 border-gray-900 text-white'
                         : 'bg-gray-50 border-gray-100 text-gray-500 hover:border-gray-200'
                     }`}
                   >
                     {g}
-                    <span className={`block text-[10px] font-medium mt-0.5 ${form.group === g ? 'text-gray-400' : 'text-gray-400'}`}>
+                    <span className={`block text-[10px] font-medium mt-0.5 ${form.groups.includes(g) ? 'text-gray-400' : 'text-gray-400'}`}>
                       {g === 'PCM' ? 'Physics · Chem · Maths' : 'Physics · Chem · Bio'}
                     </span>
                   </button>
@@ -357,9 +392,13 @@ export function CreateExam() {
 
           {/* ── Coordinators ─────────────────────────────────────────────────── */}
           {(() => {
-            const selectedClass = classes.find(c => c.id === form.classId);
-            const groupConfig = form.group === 'PCM' ? selectedClass?.pcm : selectedClass?.pcb;
-            const sections = groupConfig?.sections || [];
+            const selectedClasses = classes.filter(c => form.classIds.includes(c.id));
+            const sections = selectedClasses.flatMap(c => {
+              return form.groups.flatMap(g => {
+                const config = g === 'PCM' ? c.pcm : c.pcb;
+                return config?.sections?.map(s => ({ ...s, className: c.name, group: g })) || [];
+              });
+            });
 
             return (
               <div className="bg-white rounded-2xl border border-gray-100 p-5">
@@ -375,27 +414,27 @@ export function CreateExam() {
                   Coordinators are assigned separately per section based on the class strength. They monitor their respective sections during the live exam.
                 </p>
 
-                {!selectedClass ? (
+                {selectedClasses.length === 0 ? (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex items-center justify-center text-sm font-medium text-gray-400">
                     Select a class above to see assigned coordinators
                   </div>
                 ) : sections.length === 0 ? (
                   <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 flex flex-col items-center justify-center text-sm font-medium text-gray-400 gap-2">
-                    <p>No sections found for this class and group.</p>
+                    <p>No sections found for the selected classes and groups.</p>
                     <p className="text-xs text-amber-500 bg-amber-50 px-3 py-1.5 rounded-lg">Ensure you configure class strength and sections in Class Management.</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {sections.map(section => {
+                    {sections.map((section, idx) => {
                       const coordName = section.coordinatorCpId 
                         ? (staff.find(s => s.cpId === section.coordinatorCpId)?.name || section.coordinatorCpId)
                         : null;
 
                       return (
-                        <div key={section.sectionName} className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm transition-all">
+                        <div key={`${section.className}-${section.group}-${section.sectionName}-${idx}`} className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 shadow-sm transition-all">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
-                              Section {section.sectionName}
+                              {section.className} ({section.group}) - Sec {section.sectionName}
                             </span>
                             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
                           </div>
@@ -427,7 +466,7 @@ export function CreateExam() {
           {/* ── Submit ────────────────────────────────────────────────────────── */}
           <button
             type="submit"
-            disabled={saving || !form.classId || !form.title.trim()}
+            disabled={saving || form.classIds.length === 0 || !form.title.trim()}
             className="w-full flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl font-bold text-sm hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
           >
             {saving ? (

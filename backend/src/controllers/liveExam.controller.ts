@@ -491,6 +491,52 @@ export class LiveExamController {
     }
   }
 
+  // 6. Resume Exam (Invigilator overrides SUBMITTED or AUTO_SUBMITTED)
+  async resumeExam(req: Request, res: Response): Promise<void> {
+    try {
+      const examId = req.params.id;
+      const studentCpId = req.params.studentId as string;
+      const userCpId = (req as any).user.userId;
+      const userRole = (req as any).user.role;
+
+      const examObj = await Exam.findById(examId);
+      if (!examObj) {
+        res.status(404).json({ error: "Exam not found" });
+        return;
+      }
+      
+      const allowedStudentCpIds = await sectionService.getAllowedStudentCpIds(examObj.classId, examObj.group as 'PCM' | 'PCB', userRole, userCpId);
+      if (allowedStudentCpIds !== null && !allowedStudentCpIds.includes(studentCpId)) {
+          res.status(403).json({ error: "Forbidden: You are not authorized to unsubmit this student's exam." });
+          return;
+      }
+
+      const session = await ExamSession.findOne({ examId, studentCpId });
+      if (!session) {
+        res.status(404).json({ error: "Exam session not found for this student" });
+        return;
+      }
+
+      session.status = examObj.status === "LIVE" ? "IN_PROGRESS" : "PRESENT";
+      session.submittedAt = undefined;
+      session.tabSwitchCount = 0; // Reset violation credits!
+      await session.save();
+
+      // Relock the student's main session so they are forced into the exam again if it's LIVE
+      if (examObj.status === "LIVE") {
+        await Session.findOneAndUpdate(
+          { userId: studentCpId },
+          { isExamLocked: true, lockedExamId: examId }
+        );
+      }
+
+      res.json({ message: "Exam resumed successfully", session });
+    } catch (error) {
+      console.error("resumeExam error:", error);
+      res.status(500).json({ error: "Failed to resume exam" });
+    }
+  }
+
   // --- COORDINATOR: End Exam ---
   // Marks exam as COMPLETED, auto-submits any still-in-progress sessions, and releases all exam locks
   async endExam(req: Request, res: Response): Promise<void> {

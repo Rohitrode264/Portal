@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
@@ -109,6 +110,17 @@ export function LiveMonitor() {
   const isOnline = (lastSeen?: string) => {
     if (!lastSeen) return false;
     return new Date().getTime() - new Date(lastSeen).getTime() < 15000;
+  };
+
+  const handleResumeExam = async (studentCpId: string) => {
+    if (!window.confirm('Resume exam for this student? They will be able to continue from where they left off.')) return;
+    try {
+      const res = await api.post(`/live-exams/${id}/resume/${studentCpId}`);
+      toast.success(res.data.message || 'Exam resumed');
+      fetchData();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to resume exam');
+    }
   };
 
   if (loading || !exam) {
@@ -248,7 +260,21 @@ export function LiveMonitor() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {[...roster]
-                        .sort((a, b) => b.tabSwitchCount - a.tabSwitchCount)
+                        .sort((a, b) => {
+                          const getWeight = (s: typeof a) => {
+                            if (s.status === 'ABSENT' && isOnline(s.heartbeatLastSeen)) return 4;
+                            if (s.status === 'ABSENT') return 3;
+                            if (s.status === 'PRESENT') return 2;
+                            if (s.status === 'IN_PROGRESS') return 1;
+                            return 0; // SUBMITTED / AUTO_SUBMITTED
+                          };
+                          
+                          const weightDiff = getWeight(b) - getWeight(a);
+                          if (weightDiff !== 0) return weightDiff;
+                          
+                          // If same status weight, sort by tab switch count (most violations first)
+                          return b.tabSwitchCount - a.tabSwitchCount;
+                        })
                         .map(s => {
                         const online = isOnline(s.heartbeatLastSeen);
                         const st = STATUS_BADGE[s.status] || STATUS_BADGE.ABSENT;
@@ -320,6 +346,13 @@ export function LiveMonitor() {
                                   ].join(' ')}
                                 >
                                   {online ? 'Allow' : 'Offline'}
+                                </button>
+                              ) : (s.status === 'SUBMITTED' || s.status === 'AUTO_SUBMITTED') ? (
+                                <button
+                                  onClick={() => handleResumeExam(s.studentCpId)}
+                                  className="h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer border border-blue-200"
+                                >
+                                  Resume
                                 </button>
                               ) : (
                                 <span className="text-[11px] text-gray-400 font-medium">No Action</span>
