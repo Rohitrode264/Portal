@@ -10,7 +10,7 @@ interface RichTextDisplayProps {
   className?: string;
 }
 
-export const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ html, className = '' }) => {
+export const RichTextDisplay: React.FC<RichTextDisplayProps> = React.memo(({ html, className = '' }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
@@ -101,4 +101,4 @@ export const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ html, classNam
       )}
     </>
   );
-};
+});
