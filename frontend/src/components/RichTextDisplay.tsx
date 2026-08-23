@@ -42,6 +42,23 @@ export const RichTextDisplay: React.FC<RichTextDisplayProps> = ({ html, classNam
         ],
         throwOnError: false,
       });
+
+      // Add responsive styling and "click to expand" label to all images
+      const images = containerRef.current.querySelectorAll('img');
+      images.forEach((img) => {
+        // Add responsive and interactive classes
+        img.classList.add('cursor-pointer', 'hover:opacity-90', 'transition-opacity', 'max-h-64', 'sm:max-h-80', 'object-contain', 'rounded-xl', 'border', 'border-gray-100', 'shadow-sm', 'bg-white', 'my-2', 'max-w-full');
+        
+        // Prevent adding multiple labels if html changes and effect reruns
+        if (!img.nextElementSibling?.classList.contains('expand-label')) {
+          const label = document.createElement('div');
+          label.className = 'expand-label text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1 mb-4 flex items-center gap-1 w-full justify-center';
+          label.innerHTML = '<span class="text-blue-500">↗</span> Click on the image to expand';
+          
+          // Instead of wrapping (which might break Quill's p tags), just insert the label after the image
+          img.parentNode?.insertBefore(label, img.nextSibling);
+        }
+      });
     }
   }, [html]);
 
