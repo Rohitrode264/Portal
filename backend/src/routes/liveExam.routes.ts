@@ -19,5 +19,6 @@ router.post('/:id/heartbeat', requireRole(['STUDENT']), (req, res) => liveExamCo
 router.post('/:id/answer', requireRole(['STUDENT']), (req, res) => liveExamController.saveAnswer(req, res));
 router.post('/:id/tab-switch', requireRole(['STUDENT']), (req, res) => liveExamController.reportTabSwitch(req, res));
 router.post('/:id/submit', requireRole(['STUDENT']), (req, res) => liveExamController.submitExam(req, res));
+router.post('/:id/grievance', requireRole(['STUDENT']), (req, res) => liveExamController.submitGrievance(req, res));
 
 export default router;

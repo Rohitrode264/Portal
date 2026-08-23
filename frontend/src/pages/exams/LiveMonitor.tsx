@@ -19,6 +19,7 @@ type RosterItem = {
   submittedAt?: string;
   tabSwitchCount: number;
   heartbeatLastSeen?: string;
+  hasGrievance?: boolean;
 };
 
 const STATUS_BADGE: Record<string, { variant: any; label: string }> = {
@@ -348,12 +349,20 @@ export function LiveMonitor() {
                                   {online ? 'Allow' : 'Offline'}
                                 </button>
                               ) : (s.status === 'SUBMITTED' || s.status === 'AUTO_SUBMITTED') ? (
-                                <button
-                                  onClick={() => handleResumeExam(s.studentCpId)}
-                                  className="h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer border border-blue-200"
-                                >
-                                  Resume
-                                </button>
+                                <div className="flex items-center justify-end gap-2">
+                                  {s.hasGrievance && (
+                                    <span title="Student reported accidental submission" className="flex items-center gap-1 text-[10px] font-bold text-red-500 bg-red-50 px-2 py-1 rounded-md animate-pulse">
+                                      <AlertTriangle size={12} />
+                                      Help
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => handleResumeExam(s.studentCpId)}
+                                    className="h-7 px-3 rounded-lg text-[12px] font-semibold transition-colors bg-blue-50 text-blue-600 hover:bg-blue-100 cursor-pointer border border-blue-200"
+                                  >
+                                    Resume
+                                  </button>
+                                </div>
                               ) : (
                                 <span className="text-[11px] text-gray-400 font-medium">No Action</span>
                               )}

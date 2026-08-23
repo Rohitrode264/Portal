@@ -4,7 +4,6 @@ import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertTriangle, Clock, CheckCircle2, ShieldAlert, ShieldCheck, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAuth } from '../../context/AuthContext';
 import { RichTextDisplay } from '../../components/RichTextDisplay';
 import NoSleep from 'nosleep.js';
 
@@ -25,7 +24,6 @@ export function LiveExam() {
 
   // Tab tracking
   const [warningCount, setWarningCount] = useState(0);
-  const { user } = useAuth();
   const [isBlurred, setIsBlurred] = useState(false);
   const [isSplitScreen, setIsSplitScreen] = useState(false);
   const initialWidth = useRef(window.innerWidth);
@@ -498,9 +496,9 @@ export function LiveExam() {
                   <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">3</div>
                   <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>Do Not Close the Browser:</strong> If you accidentally close the browser, your session will be locked, and you must report to the coordinator.</p>
                 </div>
-                <div className="flex gap-3 items-start">
-                  <div className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">4</div>
-                  <p className="text-xs text-gray-700 font-medium leading-relaxed"><strong>Turn Off Auto-Rotate:</strong> Please ensure your device's screen rotation is locked/disabled before starting. Screen rotations can disrupt your exam interface.</p>
+                <div className="flex gap-3 items-start p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="w-6 h-6 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5 shadow-inner">4</div>
+                  <p className="text-xs text-amber-900 font-medium leading-relaxed"><strong>Turn Off Auto-Rotate:</strong> Please ensure your device's screen rotation is locked/disabled before starting. Screen rotations can disrupt your exam interface.</p>
                 </div>
               </div>
             </div>
@@ -543,21 +541,22 @@ export function LiveExam() {
         </div>
       )}
 
-      {/* ── Dynamic Identity Grid Watermark ── */}
-      <div className="fixed inset-0 pointer-events-none z-40 overflow-hidden flex flex-wrap items-center justify-center gap-16 p-6 opacity-[0.05]" style={{ transform: 'rotate(-25deg)' }}>
-        {Array.from({ length: 24 }).map((_, i) => (
-          <div key={i} className="text-slate-900 font-black text-sm whitespace-nowrap tracking-widest uppercase">
-            {sessionData?.studentCpId || user?.cpId || 'STUDENT'} • {user?.name || 'CET BUCKET'} • PROTECTED EXAM SESSION
-          </div>
-        ))}
-      </div>
 
       {/* Top Bar with Prominent Violation Credits */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-50 px-4 sm:px-6 py-3.5 shadow-xs">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight leading-tight">{exam.title}</h1>
-            <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{exam.group} • Clean Minimalistic Exam UI</p>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => handleFinalSubmit(false)}
+              disabled={submitting}
+              className="bg-blue-600 text-white px-4 py-2 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-xs disabled:opacity-50"
+            >
+              {submitting ? 'Submitting...' : 'Submit Exam'}
+            </button>
+            <div>
+              <h1 className="text-lg sm:text-xl font-black text-gray-900 tracking-tight leading-tight">{exam.title}</h1>
+              <p className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mt-0.5">{exam.group} • Clean Minimalistic Exam UI</p>
+            </div>
           </div>
           
           <div className="flex items-center gap-3 flex-wrap">
@@ -584,14 +583,6 @@ export function LiveExam() {
                 {Math.floor(timeLeft! / 60).toString().padStart(2, '0')}:{(timeLeft! % 60).toString().padStart(2, '0')}
               </span>
             </div>
-
-            <button 
-              onClick={() => handleFinalSubmit(false)}
-              disabled={submitting}
-              className="bg-blue-600 text-white px-5 py-2 rounded-xl font-black text-xs uppercase tracking-wider hover:bg-blue-700 transition-colors shadow-xs disabled:opacity-50"
-            >
-              {submitting ? 'Submitting...' : 'Submit Exam'}
-            </button>
           </div>
         </div>
       </div>
@@ -602,18 +593,11 @@ export function LiveExam() {
         <span>SECURITY LOCKOUT ACTIVE: Single session & anti-cheat enforced. Do not switch tabs.</span>
       </div>
 
-      {/* Main Content: Collapsible Section Accordion */}
-      <div className="max-w-4xl mx-auto py-8 px-4 sm:px-6">
-        <div className="mb-6">
-          <h2 className="text-sm font-black text-gray-400 uppercase tracking-widest mb-1">Exam Sections Overview</h2>
-          <p className="text-xs font-semibold text-gray-600">
-            Click on any subject below (e.g., Physics, Chemistry) to open and answer its questions. Click again to collapse.
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {exam.sections.map((section: any, idx: number) => {
-            const isOpen = activeSubject === section.subject;
+      {/* Subject Tabs */}
+      <div className="bg-white border-b border-gray-200 sticky z-40" style={{ top: '69px' }}>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 flex gap-2 overflow-x-auto no-scrollbar py-2.5">
+          {exam.sections.map((section: any) => {
+            const isActive = activeSubject === section.subject;
             const answeredCount = section.questions.filter((q: any) => 
               sessionData.answers.some((a: any) => a.questionId === q._id && a.selectedOption)
             ).length;
@@ -621,176 +605,167 @@ export function LiveExam() {
             const isCompleted = answeredCount === totalCount && totalCount > 0;
 
             return (
-              <div 
+              <button
                 key={section.subject}
-                className={`bg-white rounded-2xl border transition-all overflow-hidden ${
-                  isOpen 
-                    ? 'border-blue-600 shadow-md ring-1 ring-blue-600/10' 
-                    : 'border-gray-200/80 shadow-xs hover:border-gray-300 hover:shadow-sm'
+                onClick={() => {
+                  setActiveSubject(section.subject);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className={`px-4 py-2.5 rounded-xl font-bold text-sm whitespace-nowrap transition-all flex items-center gap-2.5 ${
+                  isActive 
+                    ? 'bg-blue-600 text-white shadow-md' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
               >
-                {/* Accordion Header */}
-                <button
-                  onClick={() => setActiveSubject(isOpen ? '' : section.subject)}
-                  className={`w-full px-6 py-4 flex items-center justify-between text-left transition-colors ${
-                    isOpen ? 'bg-blue-50/50 border-b border-gray-100' : 'bg-white hover:bg-gray-50/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs font-mono transition-colors ${
-                      isOpen ? 'bg-blue-600 text-white shadow-sm' : isCompleted ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {idx + 1}
-                    </div>
-                    <div>
-                      <h3 className="text-base font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
-                        {section.subject}
-                        {isCompleted && <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md uppercase tracking-wider font-sans">Completed</span>}
-                      </h3>
-                      <p className="text-xs text-gray-500 font-medium mt-0.5">
-                        {totalCount} Total Questions • Minimalistic View
-                      </p>
-                    </div>
+                {section.subject}
+                {isCompleted ? (
+                  <CheckCircle2 size={16} className={isActive ? 'text-blue-200' : 'text-emerald-500'} />
+                ) : (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-lg font-mono ${
+                    isActive ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {answeredCount}/{totalCount}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Main Content: Single Section View */}
+      <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6">
+
+        <div className="space-y-4">
+          {(() => {
+            const sectionIdx = exam.sections.findIndex((s: any) => s.subject === activeSubject);
+            const section = exam.sections[sectionIdx];
+            if (!section) return null;
+
+            const answeredCount = section.questions.filter((q: any) => 
+              sessionData.answers.some((a: any) => a.questionId === q._id && a.selectedOption)
+            ).length;
+            const totalCount = section.questions.length;
+            const isLastSection = sectionIdx === exam.sections.length - 1;
+
+            return (
+              <div className="bg-white rounded-2xl border border-gray-200/80 shadow-xs overflow-hidden animate-in fade-in duration-200">
+                <div className="p-6 space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-gray-200/60 text-xs">
+                    <span className="font-bold text-gray-500 uppercase tracking-wider">Select option A, B, C, or D below</span>
+                    <span className="font-mono text-gray-600 font-semibold">{totalCount - answeredCount} Remaining in {section.subject}</span>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs px-3 py-1 rounded-full font-mono font-bold ${
-                      answeredCount > 0 
-                        ? 'bg-blue-100/80 text-blue-800 border border-blue-200/50' 
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {answeredCount}/{totalCount} Answered
-                    </span>
-                    <span className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-200 ${
-                      isOpen ? 'bg-blue-600 text-white rotate-180' : 'bg-gray-100 text-gray-500'
-                    }`}>
-                      ▼
-                    </span>
-                  </div>
-                </button>
+                  {section.questions.map((q: any, i: number) => {
+                    const answer = sessionData.answers.find((a: any) => a.questionId === q._id);
 
-                {/* Accordion Content (Questions) */}
-                {isOpen && (
-                  <div className="p-6 bg-gray-50/30 space-y-6 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between pb-4 border-b border-gray-200/60 text-xs">
-                      <span className="font-bold text-gray-500 uppercase tracking-wider">Select option A, B, C, or D below</span>
-                      <span className="font-mono text-gray-600 font-semibold">{totalCount - answeredCount} Remaining in {section.subject}</span>
-                    </div>
-
-                    {section.questions.map((q: any, i: number) => {
-                      const answer = sessionData.answers.find((a: any) => a.questionId === q._id);
-
-                      return (
-                        <div key={q._id} className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/80 shadow-2xs hover:border-gray-300/80 transition-all">
-                          <div className="flex justify-between items-start gap-4 mb-5">
-                            <div className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed font-sans flex-1 overflow-hidden">
-                              <span className="font-black text-blue-600 mr-2 font-mono float-left mt-1">Q{i + 1}.</span> 
-                              <RichTextDisplay html={q.text} />
-                            </div>
-                            <span className="shrink-0 text-[11px] font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/60 font-mono">
-                              +{q.marks} / -{q.negativeMarks}
-                            </span>
+                    return (
+                      <div key={q._id} className="bg-white rounded-2xl p-5 sm:p-6 border border-gray-200/80 shadow-2xs hover:border-gray-300/80 transition-all">
+                        <div className="flex justify-between items-start gap-4 mb-5">
+                          <div className="font-bold text-gray-900 text-sm sm:text-base leading-relaxed font-sans flex-1 overflow-hidden">
+                            <span className="font-black text-blue-600 mr-2 font-mono float-left mt-1">Q{i + 1}.</span> 
+                            <RichTextDisplay html={q.text} />
                           </div>
-                          
-                          {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
-                            <div className="mb-6 flex justify-center cursor-pointer" onClick={() => setExpandedImage(q.diagramUrl)}>
+                          <span className="shrink-0 text-[11px] font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-lg border border-gray-200/60 font-mono">
+                            +{q.marks} / -{q.negativeMarks}
+                          </span>
+                        </div>
+                        
+                        {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
+                          <div className="mb-6 flex flex-col items-center">
+                            <div className="flex justify-center cursor-pointer relative group" onClick={() => setExpandedImage(q.diagramUrl)}>
                               <img src={q.diagramUrl} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
                             </div>
-                          )}
-                          {q.diagramUrls && q.diagramUrls.length > 0 && (
-                            <div className="mb-6 grid gap-4 grid-cols-1 sm:grid-cols-2">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-1"><span className="text-blue-500">↗</span> Click on the image to expand</span>
+                          </div>
+                        )}
+                        {q.diagramUrls && q.diagramUrls.length > 0 && (
+                          <div className="mb-6 flex flex-col items-center">
+                            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 w-full">
                               {q.diagramUrls.map((url: string) => (
-                                <div key={url} className="flex justify-center cursor-pointer" onClick={() => setExpandedImage(url)}>
+                                <div key={url} className="flex justify-center cursor-pointer relative group" onClick={() => setExpandedImage(url)}>
                                   <img src={url} alt="Question diagram" className="max-h-64 object-contain rounded-xl border border-gray-100 shadow-sm bg-white hover:opacity-90 transition-opacity" />
                                 </div>
                               ))}
                             </div>
-                          )}
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {q.options.map((opt: string, optIndex: number) => {
-                              const letter = String.fromCharCode(65 + optIndex);
-                              const isSelected = answer?.selectedOption === letter;
-                              
-                              return (
-                                <button
-                                  key={optIndex}
-                                  onClick={(e) => {
-                                    if (isScrolling.current) {
-                                      e.preventDefault();
-                                      return;
-                                    }
-                                    handleAnswerSelect(q._id, letter);
-                                  }}
-                                  className={`p-3 sm:p-3.5 rounded-xl text-left border-2 transition-all flex items-center gap-3 ${
-                                    isSelected 
-                                      ? 'bg-blue-50 border-blue-600 text-blue-950 font-bold shadow-2xs' 
-                                      : 'bg-gray-50/50 border-gray-100 hover:border-gray-300 hover:bg-gray-100/60 text-gray-700 font-medium'
-                                  }`}
-                                >
-                                  <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 transition-colors font-mono ${
-                                    isSelected ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-500 border border-gray-200'
-                                  }`}>
-                                    {letter}
-                                  </span>
-                                  <div className="text-xs sm:text-sm leading-snug font-sans text-left flex-1 min-w-0"><RichTextDisplay html={opt} /></div>
-                                </button>
-                              );
-                            })}
+                            <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-3 flex items-center gap-1"><span className="text-blue-500">↗</span> Click on the image to expand</span>
                           </div>
-                          
-                          {answer && (
-                            <div className="mt-3 pt-2.5 border-t border-gray-100 flex justify-end">
-                              <button 
-                                onClick={() => handleClearAnswer(q._id)}
-                                className="text-[11px] font-bold text-gray-400 hover:text-red-600 transition-colors uppercase tracking-wider flex items-center gap-1"
-                              >
-                                <span>Clear Selection</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                        )}
 
-                    {/* Section Quick Footer */}
-                    <div className="pt-4 border-t border-gray-200/60 flex items-center justify-between">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {q.options.map((opt: string, optIndex: number) => {
+                            const letter = String.fromCharCode(65 + optIndex);
+                            const isSelected = answer?.selectedOption === letter;
+                            
+                            return (
+                              <button
+                                key={optIndex}
+                                onClick={(e) => {
+                                  if (isScrolling.current) {
+                                    e.preventDefault();
+                                    return;
+                                  }
+                                  handleAnswerSelect(q._id, letter);
+                                }}
+                                className={`p-3 sm:p-3.5 rounded-xl text-left border-2 transition-all flex items-center gap-3 ${
+                                  isSelected 
+                                    ? 'bg-blue-50 border-blue-600 text-blue-950 font-bold shadow-2xs' 
+                                    : 'bg-gray-50/50 border-gray-100 hover:border-gray-300 hover:bg-gray-100/60 text-gray-700 font-medium'
+                                }`}
+                              >
+                                <span className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 transition-colors font-mono ${
+                                  isSelected ? 'bg-blue-600 text-white shadow-2xs' : 'bg-white text-gray-500 border border-gray-200'
+                                }`}>
+                                  {letter}
+                                </span>
+                                <div className="text-xs sm:text-sm leading-snug font-sans text-left flex-1 min-w-0"><RichTextDisplay html={opt} /></div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                        
+                        {answer && (
+                          <div className="mt-3 pt-2.5 border-t border-gray-100 flex justify-end">
+                            <button 
+                              onClick={() => handleClearAnswer(q._id)}
+                              className="text-[11px] font-bold text-gray-400 hover:text-red-600 transition-colors uppercase tracking-wider flex items-center gap-1"
+                            >
+                              <span>Clear Selection</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Section Quick Footer */}
+                  <div className="pt-4 border-t border-gray-200/60 flex items-center justify-end">
+                    {isLastSection ? (
                       <button
-                        onClick={() => setActiveSubject('')}
-                        className="text-xs font-bold text-gray-500 hover:text-gray-900 px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition-colors"
+                        onClick={() => handleFinalSubmit(false)}
+                        disabled={submitting}
+                        className="text-sm font-black text-white px-8 py-4 rounded-2xl bg-blue-600 hover:bg-blue-700 transition-all shadow-md disabled:opacity-50 uppercase tracking-wider"
                       >
-                        ↑ Collapse {section.subject}
+                        {submitting ? 'Submitting...' : 'Review & Submit Exam'}
                       </button>
-                      
-                      {(() => {
-                        const nextSection = exam.sections[idx + 1];
-                        return nextSection ? (
-                          <button
-                            onClick={() => {
-                              setActiveSubject(nextSection.subject);
-                              window.scrollTo({ top: 0, behavior: 'smooth' });
-                            }}
-                            className="text-xs font-bold text-white px-5 py-2 rounded-xl bg-gray-900 hover:bg-gray-800 transition-all flex items-center gap-1.5 shadow-xs"
-                          >
-                            <span>Open Next: {nextSection.subject}</span>
-                            <span>→</span>
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleFinalSubmit(false)}
-                            disabled={submitting}
-                            className="text-xs font-bold text-white px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 transition-all shadow-xs disabled:opacity-50"
-                          >
-                            {submitting ? 'Submitting...' : 'Review & Submit Exam'}
-                          </button>
-                        );
-                      })()}
-                    </div>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          const nextSection = exam.sections[sectionIdx + 1];
+                          setActiveSubject(nextSection.subject);
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="text-sm font-black text-white px-8 py-4 rounded-2xl bg-gray-900 hover:bg-gray-800 transition-all flex items-center gap-2 shadow-md uppercase tracking-wider"
+                      >
+                        <span>Next: {exam.sections[sectionIdx + 1].subject}</span>
+                        <span>→</span>
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             );
-          })}
+          })()}
         </div>
       </div>
       
@@ -821,6 +796,30 @@ export function LiveExam() {
               <CheckCircle2 className="w-6 h-6" />
             </div>
             <h3 className="text-[17px] font-bold text-gray-900 text-center mb-1.5 tracking-tight">Submit Exam?</h3>
+            
+            {(() => {
+              const totalQ = exam.sections.reduce((acc: number, s: any) => acc + s.questions.length, 0);
+              const attemptedQ = sessionData.answers.filter((a: any) => a.selectedOption).length;
+              const unattemptedQ = totalQ - attemptedQ;
+
+              return (
+                <div className="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100 space-y-2">
+                  <div className="flex justify-between text-[13px] font-bold text-gray-700">
+                    <span>Total Questions:</span>
+                    <span className="font-mono">{totalQ}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] font-bold text-emerald-600">
+                    <span>Attempted:</span>
+                    <span className="font-mono">{attemptedQ}</span>
+                  </div>
+                  <div className="flex justify-between text-[13px] font-bold text-amber-600">
+                    <span>Unattempted:</span>
+                    <span className="font-mono">{unattemptedQ}</span>
+                  </div>
+                </div>
+              );
+            })()}
+
             <p className="text-[13px] text-gray-500 text-center mb-6 leading-relaxed">
               Are you sure you want to submit your exam? You won&apos;t be able to change your answers after submitting.
             </p>

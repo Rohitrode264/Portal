@@ -192,7 +192,10 @@ export class StudentController {
                 examId: { $in: examIds },
                 studentCpId
             });
-            const sessionMap = new Map(sessions.map(s => [s.examId.toString(), s.status]));
+            const sessionMap = new Map(sessions.map(s => [
+                s.examId.toString(), 
+                { status: s.status, hasGrievance: !!s.hasGrievance }
+            ]));
 
             const sanitizedExams = exams.map(exam => ({
                 _id: exam._id,
@@ -205,7 +208,8 @@ export class StudentController {
                 loginWindowMinutes: exam.loginWindowMinutes || 15,
                 isResultPublished: exam.isResultPublished || false,
                 // Student's own session status for this exam
-                sessionStatus: sessionMap.get(exam._id.toString()) || null,
+                sessionStatus: sessionMap.get(exam._id.toString())?.status || null,
+                hasGrievance: sessionMap.get(exam._id.toString())?.hasGrievance || false,
             }));
 
             res.json({ exams: sanitizedExams });

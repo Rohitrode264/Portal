@@ -25,6 +25,7 @@ export interface IExamSession extends Document {
     tabSwitchCount: number; // Max 2 allowed (0, 1, 2)
     tabSwitchLog: ITabSwitch[];
     heartbeatLastSeen?: Date;
+    hasGrievance?: boolean;
 }
 
 const TabSwitchSchema = new Schema<ITabSwitch>({
@@ -53,8 +54,9 @@ const ExamSessionSchema = new Schema<IExamSession>(
         submittedAt: { type: Date },
         answers: [AnswerSchema],
         tabSwitchCount: { type: Number, default: 0 },
-        tabSwitchLog: [TabSwitchSchema],
-        heartbeatLastSeen: { type: Date }
+        tabSwitchLog: { type: [TabSwitchSchema], default: [] },
+        heartbeatLastSeen: { type: Date },
+        hasGrievance: { type: Boolean, default: false }
     },
     { timestamps: true, collection: 'portal_exam_sessions' }
 );

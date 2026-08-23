@@ -21,6 +21,7 @@ type Exam = {
   loginWindowMinutes?: number;
   isResultPublished?: boolean;
   sessionStatus: 'ABSENT' | 'PRESENT' | 'IN_PROGRESS' | 'SUBMITTED' | 'AUTO_SUBMITTED' | null;
+  hasGrievance?: boolean;
 };
 
 /* ── Countdown ────────────────────────────────────────────────────────────── */
@@ -78,6 +79,17 @@ export function StudentDashboard() {
       setExams(res.data.exams);
     } catch { toast.error('Failed to load dashboard'); }
     finally { setLoading(false); }
+  };
+
+  const handleGrievance = async (examId: string) => {
+    if (!window.confirm("Are you sure you want to request an unsubmit? Your teacher will be notified.")) return;
+    try {
+      await api.post(`/live-exams/${examId}/grievance`);
+      toast.success("Grievance raised. Please wait for the teacher to resume your exam.");
+      fetchExams();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || "Failed to submit grievance");
+    }
   };
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -198,8 +210,21 @@ export function StudentDashboard() {
                         onClick={() => !submitted && navigate(`/live-exam/${exam._id}`)}
                         disabled={submitted}
                         right={
-                          submitted
-                            ? <Badge variant="green" size="sm" dot>Submitted</Badge>
+                          submitted ? (
+                            <div className="flex flex-col items-end gap-1.5">
+                              <Badge variant="green" size="sm" dot>Submitted</Badge>
+                              {exam.hasGrievance ? (
+                                <span className="text-[10px] font-medium text-amber-500">Grievance pending</span>
+                              ) : (
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); handleGrievance(exam._id); }}
+                                  className="text-[10px] font-semibold text-blue-500 hover:underline"
+                                >
+                                  Accidental submit?
+                                </button>
+                              )}
+                            </div>
+                          )
                             : <Button variant="danger" size="sm" onClick={e => { e.stopPropagation(); navigate(`/live-exam/${exam._id}`); }}>Join Now</Button>
                         }
                       />

@@ -178,6 +178,7 @@ export class LiveExamController {
           submittedAt: session?.submittedAt || null,
           tabSwitchCount: session?.tabSwitchCount || 0,
           heartbeatLastSeen: session?.heartbeatLastSeen || null,
+          hasGrievance: session?.hasGrievance || false,
         };
       });
 
@@ -491,6 +492,33 @@ export class LiveExamController {
     }
   }
 
+  // Submit Grievance (Student)
+  async submitGrievance(req: Request, res: Response): Promise<void> {
+    try {
+      const { id } = req.params;
+      const studentCpId = (req as any).user.userId;
+
+      const session = await ExamSession.findOne({ examId: id, studentCpId });
+      if (!session) {
+        res.status(404).json({ error: "Exam session not found" });
+        return;
+      }
+
+      if (session.status !== 'SUBMITTED' && session.status !== 'AUTO_SUBMITTED') {
+        res.status(400).json({ error: "Grievance can only be raised for submitted exams" });
+        return;
+      }
+
+      session.hasGrievance = true;
+      await session.save();
+
+      res.json({ message: "Grievance raised successfully" });
+    } catch (error) {
+      console.error("submitGrievance error:", error);
+      res.status(500).json({ error: "Failed to submit grievance" });
+    }
+  }
+
   // 6. Resume Exam (Invigilator overrides SUBMITTED or AUTO_SUBMITTED)
   async resumeExam(req: Request, res: Response): Promise<void> {
     try {
@@ -520,6 +548,7 @@ export class LiveExamController {
       session.status = examObj.status === "LIVE" ? "IN_PROGRESS" : "PRESENT";
       session.submittedAt = undefined;
       session.tabSwitchCount = 0; // Reset violation credits!
+      session.hasGrievance = false; // Reset grievance
       await session.save();
 
       // Relock the student's main session so they are forced into the exam again if it's LIVE
