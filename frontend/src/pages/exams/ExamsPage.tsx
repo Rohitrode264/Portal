@@ -89,7 +89,7 @@ export function ExamsPage() {
   const { classId, group } = useParams<{ classId: string; group: string }>();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'exams' | 'sections'>('sections');
+  const [activeTab, setActiveTab] = useState<'exams' | 'sections'>(classId && group ? 'sections' : 'exams');
   const [sections, setSections] = useState<PortalSection[]>([]);
   const [classStrength, setClassStrength] = useState<number>(40);
   const [isEditingStrength, setIsEditingStrength] = useState(false);
@@ -99,11 +99,17 @@ export function ExamsPage() {
   const [className, setClassName] = useState<string>('');
   const [academicYear, setAcademicYear] = useState<string>('');
   const [exportingSection, setExportingSection] = useState<string | null>(null);
+  
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (user?.role === 'STUDENT') { navigate('/dashboard', { replace: true }); return; }
+    setActiveTab(classId && group ? 'sections' : 'exams');
     fetchExams();
     fetchStaff();
     if (classId && group) fetchSections();
@@ -382,13 +388,38 @@ export function ExamsPage() {
           ) : exams.length === 0 ? (
             <EmptyExams canCreate={canCreate} onCreateClick={() => navigate(`/exams/create${classId && group ? `?classId=${classId}&group=${group}` : ''}`)} />
           ) : (
-            <div className="card overflow-hidden stagger" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
-              {/* Fix: Added horizontal scroll wrapper */}
-              <div className="overflow-x-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>Exam</th>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search exams..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-[13px] w-64 focus:outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-shadow bg-white"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-1 bg-white border border-gray-100 rounded-lg shadow-sm">
+                  {['ALL', 'DRAFT', 'PUBLISHED', 'LIVE', 'COMPLETED'].map(status => (
+                    <button
+                      key={status}
+                      onClick={() => setStatusFilter(status)}
+                      className={`px-3 py-1.5 rounded-md text-[12px] font-semibold transition-colors capitalize ${statusFilter === status ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {status === 'ALL' ? 'All Exams' : status.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="card overflow-hidden stagger" style={{ background: 'var(--surface)', borderColor: 'var(--card-border)' }}>
+                <div className="overflow-x-auto">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Exam</th>
                       <th>Class · Group</th>
                       <th>Subjects</th>
                       <th>Scheduled</th>
@@ -398,9 +429,15 @@ export function ExamsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {exams.map(exam => {
+                    {exams
+                      .filter(exam => {
+                        const matchesSearch = exam.title.toLowerCase().includes(searchQuery.toLowerCase());
+                        const matchesStatus = statusFilter === 'ALL' || exam.status === statusFilter;
+                        return matchesSearch && matchesStatus;
+                      })
+                      .map(exam => {
                       const st = STATUS_CONFIG[exam.status] || STATUS_CONFIG.DRAFT;
-                      const totalQ = exam.sections?.reduce((sum, s) => sum + s.questions.length, 0) ?? 0;
+                      const totalQ = (exam as any).totalQuestions ?? (exam.sections?.reduce((sum, s) => sum + (s.questions?.length || 0), 0) ?? 0);
                       return (
                         <tr
                           key={exam._id}
@@ -471,6 +508,7 @@ export function ExamsPage() {
                   </tbody>
                 </table>
               </div>
+            </div>
             </div>
           )
         )}

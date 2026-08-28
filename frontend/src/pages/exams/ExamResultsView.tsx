@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Trophy, Users, Award, CheckCircle2, AlertCircle, Share2, EyeOff } from 'lucide-react';
+import { ArrowLeft, Trophy, Users, Award, CheckCircle2, AlertCircle, Share2, EyeOff, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Badge } from '../../components/ui/Badge';
@@ -107,6 +108,51 @@ export function ExamResultsView() {
     }
   };
 
+  const handleDownloadExcel = () => {
+    if (!data) return;
+    const headers = ['Rank', 'Student Name', 'Student ID', 'Status', 'Total Score', 'Correct', 'Wrong', 'Unattempted', 'Percentile'];
+    const subjects = ['PHYSICS', 'CHEMISTRY', data.exam.group === 'PCM' ? 'MATHS' : 'BIOLOGY'];
+    subjects.forEach(s => {
+      headers.push(`${s} Score`, `${s} Correct`, `${s} Wrong`, `${s} Unattempted`);
+    });
+
+    const rows = processedRoster.map(r => {
+      const row = [
+        r.attended && r.rank ? r.rank : 'N/A',
+        r.name,
+        r.studentCpId,
+        r.attended ? 'Present' : 'Absent',
+        r.attended ? r.totalScore : 0,
+        r.attended ? r.correctCount : 0,
+        r.attended ? r.wrongCount : 0,
+        r.attended ? r.unattemptedCount : 0,
+        r.attended && r.percentile !== null ? r.percentile : 'N/A',
+      ];
+      subjects.forEach(s => {
+        const sData = r.subjectScores[s];
+        if (sData) {
+          row.push(sData.score, sData.correct, sData.wrong, sData.unattempted);
+        } else {
+          row.push(0, 0, 0, 0);
+        }
+      });
+      return row;
+    });
+
+    const wsData = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Auto-adjust column widths based on headers
+    ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length, 10) }));
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Results");
+    
+    // Ensure filename is safe
+    const safeTitle = data.exam.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    XLSX.writeFile(wb, `${safeTitle}_results.xlsx`);
+  };
+
   if (loading || !data) {
     return <DashboardLayout><LoadingSpinner fullPage /></DashboardLayout>;
   }
@@ -149,15 +195,25 @@ export function ExamResultsView() {
             </div>
           </div>
 
-          <Button
-            variant={exam.isResultPublished ? 'outline' : 'success'}
-            size="md"
-            isLoading={publishing}
-            leftIcon={exam.isResultPublished ? <EyeOff size={14} /> : <Share2 size={14} />}
-            onClick={handleTogglePublish}
-          >
-            {exam.isResultPublished ? 'Unpublish Results' : 'Publish Results'}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="md"
+              leftIcon={<Download size={14} />}
+              onClick={handleDownloadExcel}
+            >
+              Export Excel
+            </Button>
+            <Button
+              variant={exam.isResultPublished ? 'outline' : 'success'}
+              size="md"
+              isLoading={publishing}
+              leftIcon={exam.isResultPublished ? <EyeOff size={14} /> : <Share2 size={14} />}
+              onClick={handleTogglePublish}
+            >
+              {exam.isResultPublished ? 'Unpublish Results' : 'Publish Results'}
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -330,13 +386,17 @@ export function ExamResultsView() {
                       {/* Stats */}
                       <td className="py-3.5 px-4 text-center">
                         {r.attended ? (
-                          <span className="inline-flex items-center gap-1.5 text-[12px] font-mono bg-gray-50 px-2.5 py-1 rounded-lg">
-                            <span className="text-emerald-600 font-bold">+{correct}</span>
-                            <span className="text-gray-200">/</span>
-                            <span className="text-red-500 font-bold">−{wrong}</span>
-                            <span className="text-gray-200">/</span>
-                            <span className="text-gray-400">{unatt}</span>
-                          </span>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="flex items-center gap-1 text-[11px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-medium border border-emerald-100">
+                              <CheckCircle2 size={12} /> {correct}
+                            </span>
+                            <span className="flex items-center gap-1 text-[11px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-medium border border-red-100">
+                              <AlertCircle size={12} /> {wrong}
+                            </span>
+                            <span className="flex items-center gap-1 text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded font-medium border border-gray-200">
+                              <span className="w-1.5 h-0.5 bg-gray-400 rounded-full" /> {unatt}
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-gray-300 text-[12px]">—</span>
                         )}

@@ -1,5 +1,6 @@
 /* eslint-disable */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, AlertTriangle, Clock, CheckCircle2, ShieldAlert, ShieldCheck, X } from 'lucide-react';
@@ -15,7 +16,16 @@ export function LiveExam() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const imageDialogRef = useRef<HTMLDialogElement>(null);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (expandedImage && imageDialogRef.current && !imageDialogRef.current.open) {
+      imageDialogRef.current.showModal();
+    } else if (!expandedImage && imageDialogRef.current && imageDialogRef.current.open) {
+      imageDialogRef.current.close();
+    }
+  }, [expandedImage]);
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [approvalStage, setApprovalStage] = useState<'waiting_coordinator' | 'verified_present'>('waiting_coordinator');
   const [activeSubject, setActiveSubject] = useState<string>('');
@@ -460,7 +470,7 @@ export function LiveExam() {
       onContextMenu={e => e.preventDefault()}
     >
       {/* ── Rules Modal Overlay (Google Design Standard) ── */}
-      {showRules && (
+      {showRules && createPortal(
         <div className="fixed inset-0 z-[200] bg-gray-900/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
             <div className="bg-blue-600 px-6 py-5 flex items-center gap-3">
@@ -514,11 +524,12 @@ export function LiveExam() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Security Overlay Redesign (Google Standard) ── */}
-      {(isBlurred || isSplitScreen) && (
+      {(isBlurred || isSplitScreen) && createPortal(
         <div className="fixed inset-0 z-[100] bg-white/90 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none">
           <div className="bg-white border border-gray-200 shadow-2xl rounded-3xl p-8 max-w-lg w-full flex flex-col items-center">
             <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mb-6 border border-red-100 animate-pulse shadow-inner">
@@ -538,7 +549,8 @@ export function LiveExam() {
               <p className="text-[11px] text-red-400 font-bold uppercase tracking-wider mt-1">Auto-submit on 5th violation</p>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
 
@@ -769,27 +781,32 @@ export function LiveExam() {
         </div>
       </div>
       
-      {expandedImage && (
-        <div 
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-          onClick={() => setExpandedImage(null)}
-        >
+      <dialog 
+        ref={imageDialogRef}
+        onClose={() => setExpandedImage(null)}
+        onClick={(e) => {
+          if (e.target === imageDialogRef.current) setExpandedImage(null);
+        }}
+        className="m-auto p-0 bg-transparent backdrop:bg-black/90 backdrop:backdrop-blur-sm outline-none border-none overflow-visible max-w-[100vw] max-h-[100vh]"
+      >
+        <div className="relative flex flex-col items-center justify-center p-4">
           <button 
-            className="absolute top-4 right-4 text-white hover:text-gray-300 p-2 bg-black/50 rounded-full"
+            className="absolute -top-10 right-0 z-50 text-white hover:text-gray-300 p-2 bg-white/20 rounded-full backdrop-blur-md"
             onClick={() => setExpandedImage(null)}
           >
             <X className="w-6 h-6" />
           </button>
-          <img 
-            src={expandedImage} 
-            alt="Expanded view" 
-            className="max-w-full max-h-[90vh] object-contain bg-white rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {expandedImage && (
+            <img 
+              src={expandedImage} 
+              alt="Expanded view" 
+              className="max-w-full max-h-[85vh] object-contain bg-white rounded-lg shadow-2xl"
+            />
+          )}
         </div>
-      )}
+      </dialog>
 
-      {showSubmitModal && (
+      {showSubmitModal && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
             <div className="flex items-center justify-center w-12 h-12 rounded-full bg-blue-50 text-blue-600 mb-4 mx-auto">
@@ -840,7 +857,8 @@ export function LiveExam() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

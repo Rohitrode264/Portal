@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -423,6 +424,16 @@ export function ExamDetail() {
     setMetaDraft(p => ({ ...p, [key]: val }));
 
   const [expandedQ, setExpandedQ] = useState<string | null>(null);
+  const [expandedImage, setExpandedImage] = useState<string | null>(null);
+  const imageDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    if (expandedImage && imageDialogRef.current && !imageDialogRef.current.open) {
+      imageDialogRef.current.showModal();
+    } else if (!expandedImage && imageDialogRef.current && imageDialogRef.current.open) {
+      imageDialogRef.current.close();
+    }
+  }, [expandedImage]);
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduleDate, setScheduleDate] = useState('');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -1219,15 +1230,23 @@ export function ExamDetail() {
                       {isExpanded && !isEditing && (
                         <div className="border-t border-gray-50 px-4 pb-4 pt-3 space-y-3">
                           {q.diagramUrl && !(q.diagramUrls && q.diagramUrls.includes(q.diagramUrl)) && (
-                            <div className="mb-3 flex justify-center">
-                              <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white" />
+                            <div className="mb-3 flex flex-col items-center">
+                              <div className="flex justify-center cursor-pointer group relative" onClick={() => setExpandedImage(q.diagramUrl!)}>
+                                <img src={q.diagramUrl} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white hover:opacity-90 transition-opacity" />
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-1"><span className="text-blue-500">↗</span> Click on the image to expand</span>
                             </div>
                           )}
                           {q.diagramUrls && q.diagramUrls.length > 0 && (
-                            <div className="mb-3 flex flex-wrap gap-3 justify-center">
-                              {q.diagramUrls.map(url => (
-                                <img key={url} src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white" />
-                              ))}
+                            <div className="mb-3 flex flex-col items-center">
+                              <div className="flex flex-wrap gap-3 justify-center w-full">
+                                {q.diagramUrls.map(url => (
+                                  <div key={url} className="flex justify-center cursor-pointer group relative" onClick={() => setExpandedImage(url)}>
+                                    <img src={url} alt="Question diagram" className="max-h-48 object-contain rounded-lg border border-gray-100 bg-white hover:opacity-90 transition-opacity" />
+                                  </div>
+                                ))}
+                              </div>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-2 flex items-center gap-1"><span className="text-blue-500">↗</span> Click on the image to expand</span>
                             </div>
                           )}
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1302,6 +1321,32 @@ export function ExamDetail() {
         )}
 
       </div>
+
+      {/* Image Expansion Modal */}
+      <dialog 
+        ref={imageDialogRef}
+        onClose={() => setExpandedImage(null)}
+        onClick={(e) => {
+          if (e.target === imageDialogRef.current) setExpandedImage(null);
+        }}
+        className="m-auto p-0 bg-transparent backdrop:bg-black/90 backdrop:backdrop-blur-sm outline-none border-none overflow-visible max-w-[100vw] max-h-[100vh]"
+      >
+        <div className="relative flex flex-col items-center justify-center p-4">
+          <button 
+            className="absolute -top-10 right-0 z-50 text-white hover:text-gray-300 p-2 bg-white/20 rounded-full backdrop-blur-md"
+            onClick={() => setExpandedImage(null)}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {expandedImage && (
+            <img 
+              src={expandedImage} 
+              alt="Expanded view" 
+              className="max-w-full max-h-[85vh] object-contain bg-white rounded-lg shadow-2xl"
+            />
+          )}
+        </div>
+      </dialog>
 
       {/* Import Questions Modal */}
       <ImportQuestionsModal

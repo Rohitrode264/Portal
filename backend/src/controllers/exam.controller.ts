@@ -177,11 +177,26 @@ export class ExamController {
             if (group) query.group = group;
             if (status) query.status = status;
 
-            const exams = await Exam.find(query).sort({ createdAt: -1 });
+            // Select only needed fields, avoiding huge question text and options
+            const exams = await Exam.find(query)
+                .select('title classId className group status duration scheduledAt createdBy sections.subject sections.questions._id')
+                .sort({ createdAt: -1 });
+
             const resolvedExams = await Promise.all(exams.map(async (exam) => {
                 const examObj = exam.toObject() as any;
                 const creator = await User.findOne({ cpId: exam.createdBy }).select('name');
                 examObj.createdByFields = creator ? { name: creator.name, cpId: exam.createdBy } : { name: exam.createdBy, cpId: exam.createdBy };
+                
+                // Compute totalQuestions and delete the questions array to minimize payload
+                if (examObj.sections) {
+                    let totalQuestions = 0;
+                    examObj.sections.forEach((s: any) => {
+                        totalQuestions += (s.questions ? s.questions.length : 0);
+                        delete s.questions;
+                    });
+                    examObj.totalQuestions = totalQuestions;
+                }
+
                 return examObj;
             }));
 

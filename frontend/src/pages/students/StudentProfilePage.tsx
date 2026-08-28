@@ -84,7 +84,10 @@ export function StudentProfilePage() {
 
     const avgScore = exams.length > 0 ? (exams.reduce((a, b) => a + (b.score / b.maxMarks * 100), 0) / exams.length).toFixed(1) : '0.0';
     const bestRank = exams.length > 0 ? Math.min(...exams.map(e => e.rank)) : 'N/A';
-    const bestPercentile = exams.length > 0 ? Math.max(...exams.map(e => e.percentile)) : 'N/A';
+    
+    const totalAttempted = exams.reduce((a, b) => a + b.correct + b.wrong, 0);
+    const totalCorrect = exams.reduce((a, b) => a + b.correct, 0);
+    const accuracy = totalAttempted > 0 ? ((totalCorrect / totalAttempted) * 100).toFixed(1) : '0.0';
 
     return (
         <DashboardLayout>
@@ -210,9 +213,9 @@ export function StudentProfilePage() {
                                     <div className="w-9 h-9 rounded-2xl bg-white text-amber-600 flex items-center justify-center shadow-sm">
                                         <BarChart2 size={18} />
                                     </div>
-                                    <div className="text-[10px] font-extrabold text-amber-800/80 uppercase tracking-widest leading-tight">Top<br/>Percentile</div>
+                                    <div className="text-[10px] font-extrabold text-amber-800/80 uppercase tracking-widest leading-tight">Overall<br/>Accuracy</div>
                                 </div>
-                                <div className="text-3xl font-black text-amber-950 tracking-tight relative z-10">{bestPercentile}</div>
+                                <div className="text-3xl font-black text-amber-950 tracking-tight relative z-10">{accuracy}%</div>
                             </div>
                         </div>
 
@@ -227,7 +230,7 @@ export function StudentProfilePage() {
                                             <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Exam Title</th>
                                             <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Score</th>
                                             <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Rank / Total</th>
-                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Percentile</th>
+                                            <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase">Accuracy</th>
                                             <th className="px-6 py-4 text-[11px] font-bold tracking-wider text-gray-500 uppercase text-right">Actions</th>
                                         </tr>
                                     </thead>
@@ -255,8 +258,8 @@ export function StudentProfilePage() {
                                                     <span className="text-gray-400 font-medium text-xs ml-1">/ {exam.totalAttended}</span>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <span className="inline-flex px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs font-black">
-                                                        {exam.percentile}
+                                                    <span className="inline-flex px-2 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-black">
+                                                        {((exam.correct / (exam.correct + exam.wrong) * 100) || 0).toFixed(1)}%
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
@@ -281,29 +284,54 @@ export function StudentProfilePage() {
             <div className="hidden">
                 <div ref={printRef} className="print-container" style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
                     <style>{`
-                        @page { size: A5 portrait; margin: 10mm 10mm 12mm 14mm; }
-                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-                        body { font-family: "Inter", sans-serif; font-size: 11px; line-height: 1.4; color: #111; }
-                        h1, h2, h3, h4 { margin: 0; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-                        th { background-color: #f3f4f6; text-align: left; padding: 6px 8px; font-weight: 600; font-size: 10px; border-bottom: 2px solid #e5e7eb; }
-                        td { padding: 6px 8px; border-bottom: 1px solid #e5e7eb; font-size: 10px; }
+                        @page { size: A5 portrait; margin: 10mm 12mm 12mm 12mm; }
+                        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+                        body { font-family: "Inter", sans-serif; font-size: 11px; line-height: 1.5; color: #1e293b; background: white; }
+                        h1, h2, h3, h4 { margin: 0; color: #0f172a; }
+                        
+                        /* Premium Header */
+                        .header-box { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 12px; margin-bottom: 20px; border-bottom: 2px solid #3b82f6; position: relative; }
+                        .header-box::after { content: ''; position: absolute; bottom: -5px; left: 0; width: 100%; height: 1px; background: #bfdbfe; }
+                        .org-name { font-size: 20px; font-weight: 900; letter-spacing: -0.02em; color: #1e3a8a; }
+                        .org-sub { font-size: 10px; color: #64748b; font-weight: 500; margin-top: 2px; }
+                        
+                        /* Titles */
+                        .title { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; text-align: center; color: #1e40af; background: #eff6ff; padding: 6px 12px; border-radius: 6px; display: inline-block; position: relative; left: 50%; transform: translateX(-50%); }
+                        
+                        /* Student Info Card */
+                        .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #f8fafc; padding: 12px 16px; border-radius: 10px; border: 1px solid #e2e8f0; }
+                        .info-item { font-size: 10.5px; }
+                        .info-item span { font-weight: 700; color: #475569; margin-right: 6px; text-transform: uppercase; font-size: 9px; letter-spacing: 0.02em; }
+                        .info-item strong { color: #0f172a; font-weight: 600; }
+                        
+                        /* Summary Stats */
+                        .summary-boxes { display: flex; gap: 12px; margin-bottom: 20px; }
+                        .s-box { flex: 1; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 8px; text-align: center; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.02); border-bottom: 2px solid #cbd5e1; }
+                        .s-box .label { font-size: 9px; color: #64748b; text-transform: uppercase; font-weight: 700; letter-spacing: 0.02em; }
+                        .s-box .val { font-size: 16px; font-weight: 800; color: #0f172a; margin-top: 4px; }
+                        
+                        /* Tables */
+                        table { width: 100%; border-collapse: separate; border-spacing: 0; margin-top: 5px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+                        th { background-color: #f1f5f9; text-align: left; padding: 8px 10px; font-weight: 700; font-size: 9.5px; color: #475569; text-transform: uppercase; letter-spacing: 0.02em; border-bottom: 1px solid #cbd5e1; }
+                        td { padding: 8px 10px; border-bottom: 1px solid #e2e8f0; font-size: 10.5px; color: #1e293b; }
+                        tr:last-child td { border-bottom: none; }
                         .text-right { text-align: right; }
                         .text-center { text-align: center; }
                         .font-bold { font-weight: 700; }
-                        .header-box { display: flex; justify-content: space-between; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 15px; }
-                        .org-name { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
-                        .org-sub { font-size: 10px; color: #4b5563; }
-                        .title { font-size: 14px; font-weight: 700; text-transform: uppercase; margin-bottom: 10px; text-align: center; text-decoration: underline; }
-                        .student-info { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 15px; background: #f9fafb; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; }
-                        .info-item span { font-weight: 600; margin-right: 5px; }
-                        .summary-boxes { display: flex; gap: 10px; margin-bottom: 15px; }
-                        .s-box { flex: 1; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; text-align: center; background: #fff; }
-                        .s-box .label { font-size: 9px; color: #6b7280; text-transform: uppercase; font-weight: 600; }
-                        .s-box .val { font-size: 14px; font-weight: 700; color: #111; margin-top: 2px; }
-                        .subject-scores { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-                        .subj-card { flex: 1; min-width: 30%; border: 1px dashed #d1d5db; padding: 8px; border-radius: 4px; }
-                        .subj-card h4 { font-size: 10px; text-transform: uppercase; margin-bottom: 4px; color: #374151; }
+                        
+                        /* Subject Cards */
+                        .subject-scores { display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+                        .subj-card { flex: 1; min-width: 30%; border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+                        .subj-card h4 { font-size: 10px; text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; margin-bottom: 8px; color: #334155; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; }
+                        .subj-score { font-size: 14px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+                        .subj-stats { display: flex; justify-content: space-between; font-size: 9.5px; font-weight: 600; color: #64748b; background: #f8fafc; padding: 4px 6px; border-radius: 4px; }
+                        .stat-c { color: #16a34a; }
+                        .stat-w { color: #dc2626; }
+                        .stat-u { color: #94a3b8; }
+                        
+                        /* Footer signatures */
+                        .signatures { margin-top: 40px; display: flex; justify-content: space-between; padding: 0 30px; }
+                        .sig-line { border-top: 1px dashed #94a3b8; padding-top: 6px; width: 100px; text-align: center; font-size: 9.5px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; }
                     `}</style>
 
                     <div className="header-box">
@@ -322,12 +350,12 @@ export function StudentProfilePage() {
                     </div>
 
                     <div className="student-info">
-                        <div className="info-item"><span>Name:</span> {profile.name}</div>
-                        <div className="info-item"><span>ID:</span> {profile.admissionNumber}</div>
-                        <div className="info-item"><span>Class:</span> {profile.className}</div>
-                        <div className="info-item"><span>Group:</span> {profile.cetBucket}</div>
-                        {profile.section && <div className="info-item"><span>Batch:</span> {profile.section}</div>}
-                        <div className="info-item"><span>Session:</span> {profile.academicYear}</div>
+                        <div className="info-item"><span>Name:</span> <strong>{profile.name}</strong></div>
+                        <div className="info-item"><span>ID:</span> <strong>{profile.admissionNumber}</strong></div>
+                        <div className="info-item"><span>Class:</span> <strong>{profile.className}</strong></div>
+                        <div className="info-item"><span>Group:</span> <strong>{profile.cetBucket}</strong></div>
+                        {profile.section && <div className="info-item"><span>Batch:</span> <strong>{profile.section}</strong></div>}
+                        <div className="info-item"><span>Session:</span> <strong>{profile.academicYear}</strong></div>
                     </div>
 
                     {isPrintingSingle && printingExam ? (
@@ -338,19 +366,21 @@ export function StudentProfilePage() {
                             </div>
                             
                             <div className="summary-boxes">
-                                <div className="s-box"><div className="label">Total Score</div><div className="val">{printingExam.score} / {printingExam.maxMarks}</div></div>
-                                <div className="s-box"><div className="label">Class Rank</div><div className="val">#{printingExam.rank} <span style={{fontSize: 10, fontWeight: 400}}>/ {printingExam.totalAttended}</span></div></div>
-                                <div className="s-box"><div className="label">Percentile</div><div className="val">{printingExam.percentile}</div></div>
+                                <div className="s-box"><div className="label">Total Score</div><div className="val">{printingExam.score} <span style={{fontSize: 10, fontWeight: 600, color: '#64748b'}}>/ {printingExam.maxMarks}</span></div></div>
+                                <div className="s-box"><div className="label">Class Rank</div><div className="val">#{printingExam.rank} <span style={{fontSize: 10, fontWeight: 600, color: '#64748b'}}>/ {printingExam.totalAttended}</span></div></div>
+                                <div className="s-box"><div className="label">Accuracy</div><div className="val">{((printingExam.correct / (printingExam.correct + printingExam.wrong) * 100) || 0).toFixed(1)}%</div></div>
                             </div>
 
-                            <div style={{ fontSize: 11, fontWeight: 600, marginTop: 15, marginBottom: 5 }}>Subject-wise Breakdown</div>
+                            <div style={{ fontSize: 11, fontWeight: 800, marginTop: 20, marginBottom: 8, color: '#1e293b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Subject-wise Breakdown</div>
                             <div className="subject-scores">
                                 {Object.entries(printingExam.subjectScores).map(([subj, s]) => (
                                     <div key={subj} className="subj-card">
                                         <h4>{subj}</h4>
-                                        <div style={{ fontSize: 12, fontWeight: 700 }}>{s.score} marks</div>
-                                        <div style={{ fontSize: 9, color: '#4b5563', marginTop: 4 }}>
-                                            ✓ {s.correct} &nbsp; ✗ {s.wrong} &nbsp; O {s.unattempted}
+                                        <div className="subj-score">{s.score} <span style={{fontSize: 10, fontWeight: 600, color: '#64748b'}}>marks</span></div>
+                                        <div className="subj-stats">
+                                            <span className="stat-c">✓ {s.correct}</span>
+                                            <span className="stat-w">✗ {s.wrong}</span>
+                                            <span className="stat-u">O {s.unattempted}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -361,10 +391,10 @@ export function StudentProfilePage() {
                             <div className="summary-boxes">
                                 <div className="s-box"><div className="label">Exams Taken</div><div className="val">{exams.length}</div></div>
                                 <div className="s-box"><div className="label">Avg Score</div><div className="val">{avgScore}%</div></div>
-                                <div className="s-box"><div className="label">Top Rank</div><div className="val">#{bestRank}</div></div>
+                                <div className="s-box"><div className="label">Accuracy</div><div className="val">{accuracy}%</div></div>
                             </div>
 
-                            <div className="overflow-x-auto">
+                            <div>
                                 <table>
                                     <thead>
                                         <tr>
@@ -372,17 +402,17 @@ export function StudentProfilePage() {
                                         <th>Exam Title</th>
                                         <th className="text-right">Score</th>
                                         <th className="text-center">Rank</th>
-                                        <th className="text-right">PR</th>
+                                        <th className="text-right">Acc.</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {exams.map(e => (
                                         <tr key={e.examId}>
-                                            <td>{new Date(e.scheduledAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short' })}</td>
+                                            <td style={{ color: '#64748b', fontWeight: 500 }}>{new Date(e.scheduledAt).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'2-digit' })}</td>
                                             <td className="font-bold">{e.title}</td>
-                                            <td className="text-right">{e.score}/{e.maxMarks}</td>
-                                            <td className="text-center">#{e.rank}/{e.totalAttended}</td>
-                                            <td className="text-right font-bold">{e.percentile}</td>
+                                            <td className="text-right font-bold">{e.score}<span style={{fontSize: 9, fontWeight: 500, color: '#94a3b8'}}>/{e.maxMarks}</span></td>
+                                            <td className="text-center font-bold">#{e.rank}<span style={{fontSize: 9, fontWeight: 500, color: '#94a3b8'}}>/{e.totalAttended}</span></td>
+                                            <td className="text-right font-bold" style={{ color: '#0369a1' }}>{((e.correct / (e.correct + e.wrong) * 100) || 0).toFixed(0)}%</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -391,12 +421,12 @@ export function StudentProfilePage() {
                         </>
                     )}
 
-                    <div style={{ marginTop: 40, display: 'flex', justifyContent: 'space-between', padding: '0 20px' }}>
-                        <div style={{ textAlign: 'center' }}>
-                            <div style={{ borderTop: '1px solid #111', paddingTop: 5, width: 80, fontSize: 9 }}>Student Sign</div>
+                    <div className="signatures">
+                        <div>
+                            <div className="sig-line">Student Sign</div>
                         </div>
-                        <div style={{ textAlign: 'center' }}>
-                            <div style={{ borderTop: '1px solid #111', paddingTop: 5, width: 80, fontSize: 9 }}>Admin Sign</div>
+                        <div>
+                            <div className="sig-line">Admin Sign</div>
                         </div>
                     </div>
                 </div>

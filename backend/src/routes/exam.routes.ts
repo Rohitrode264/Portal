@@ -21,13 +21,13 @@ router.post('/', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => e
 router.patch('/:id', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.updateExam(req, res));
 
 // 4. Question Management (Teachers & Assistants)
-router.post('/:id/sections/:subject/questions', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.addQuestion(req, res));
-router.patch('/:id/sections/:subject/questions/:qId', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.updateQuestion(req, res));
-router.delete('/:id/sections/:subject/questions/:qId', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.removeQuestion(req, res));
+router.post('/:id/sections/:subject/questions', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.addQuestion(req, res));
+router.patch('/:id/sections/:subject/questions/:qId', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.updateQuestion(req, res));
+router.delete('/:id/sections/:subject/questions/:qId', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.removeQuestion(req, res));
 
 // 5. Section Management (Assigned Teacher only - verified in controller)
 router.patch('/:id/sections/:subject', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.updateSectionMetadata(req, res));
-router.patch('/:id/sections/:subject/approve', requireRole(['TEACHER', 'ASSISTANT']), (req, res) => examController.approveSection(req, res));
+router.patch('/:id/sections/:subject/approve', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.approveSection(req, res));
 router.patch('/:id/sections/:subject/unlock', requireRole(['ADMIN']), (req, res) => examController.unlockSection(req, res));
 
 // 6. Exam Lifecycle (Admin or Coordinator)
@@ -39,7 +39,7 @@ router.patch('/:id/archive', requireRole(['ADMIN']), (req, res) => examControlle
 
 // 7. Results & Publishing (Admin, Teacher, Assistant)
 router.get('/:id/results', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.getExamResults(req, res));
-router.post('/:id/publish-result', requireRole(['ADMIN', 'TEACHER', 'ASSISTANT']), (req, res) => examController.publishResult(req, res));
+router.post('/:id/publish-result', requireRole(['ADMIN']), (req, res) => examController.publishResult(req, res));
 
 export default router;
 
