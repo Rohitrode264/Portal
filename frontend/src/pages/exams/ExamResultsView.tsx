@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '../../components/layout/DashboardLayout';
 import { api } from '../../lib/api';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { ArrowLeft, Trophy, Users, Award, CheckCircle2, AlertCircle, Share2, EyeOff, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
@@ -74,6 +75,7 @@ export function ExamResultsView() {
   const [filterSubj, setFilterSubj] = useState<string>('ALL');
   const [filterSort, setFilterSort] = useState<string>('highest');
   const [filterAttendance, setFilterAttendance] = useState<string>('ALL');
+  const { user } = useAuth();
 
   useEffect(() => { fetchResults(); }, [id]);
 
@@ -204,15 +206,17 @@ export function ExamResultsView() {
             >
               Export Excel
             </Button>
-            <Button
-              variant={exam.isResultPublished ? 'outline' : 'success'}
-              size="md"
-              isLoading={publishing}
-              leftIcon={exam.isResultPublished ? <EyeOff size={14} /> : <Share2 size={14} />}
-              onClick={handleTogglePublish}
-            >
-              {exam.isResultPublished ? 'Unpublish Results' : 'Publish Results'}
-            </Button>
+            {user?.role === 'ADMIN' && (
+              <Button
+                variant={exam.isResultPublished ? 'outline' : 'success'}
+                size="md"
+                isLoading={publishing}
+                leftIcon={exam.isResultPublished ? <EyeOff size={14} /> : <Share2 size={14} />}
+                onClick={handleTogglePublish}
+              >
+                {exam.isResultPublished ? 'Unpublish Results' : 'Publish Results'}
+              </Button>
+            )}
           </div>
         </div>
 
